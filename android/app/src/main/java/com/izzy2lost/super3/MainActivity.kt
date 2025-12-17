@@ -46,6 +46,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        applyImmersiveMode()
         setContentView(R.layout.activity_main)
 
         gamesFolderText = findViewById(R.id.games_folder_text)
@@ -73,6 +74,11 @@ class MainActivity : AppCompatActivity() {
         AssetInstaller.ensureInstalled(this, internalUserRoot())
 
         refreshUi()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        applyImmersiveMode()
     }
 
     private fun loadPrefs() {

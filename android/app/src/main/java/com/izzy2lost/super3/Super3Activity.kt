@@ -29,6 +29,18 @@ class Super3Activity : SDLActivity() {
         return args.toTypedArray()
     }
 
+    override fun onResume() {
+        super.onResume()
+        applyImmersiveMode()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            applyImmersiveMode()
+        }
+    }
+
     override fun onStop() {
         super.onStop()
         val uriStr = getSharedPreferences("super3_prefs", MODE_PRIVATE).getString("userTreeUri", null) ?: return
@@ -39,4 +51,3 @@ class Super3Activity : SDLActivity() {
         }
     }
 }
-
