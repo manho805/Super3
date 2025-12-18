@@ -312,6 +312,10 @@ struct Super3Host {
         return false;
       }
 
+      const bool gunGame =
+        (game.inputs & (Game::INPUT_GUN1 | Game::INPUT_GUN2 | Game::INPUT_ANALOG_GUN1 | Game::INPUT_ANALOG_GUN2)) != 0;
+      inputSystem.SetGunTouchEnabled(gunGame);
+
       // Apply Supermodel.ini overrides (Global + [ game ]) after the loader has determined game->name.
       ApplyIniOverrides(game.name);
       ApplyAndroidHardOverrides();

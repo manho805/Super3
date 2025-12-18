@@ -1,12 +1,36 @@
 #include "android_input_system.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 AndroidInputSystem::AndroidInputSystem()
   : CInputSystem("android-sdl"),
     m_keys(SDL_NUM_SCANCODES, 0)
 {
+  std::memset(&m_mouseDetails, 0, sizeof(m_mouseDetails));
+  std::strncpy(m_mouseDetails.name, "Touchscreen", MAX_NAME_LENGTH);
+  m_mouseDetails.name[MAX_NAME_LENGTH] = '\0';
+  m_mouseDetails.isAbsolute = true;
+}
+
+AndroidInputSystem::~AndroidInputSystem()
+{
+  CloseControllers();
+}
+
+void AndroidInputSystem::SetGunTouchEnabled(bool enabled)
+{
+  if (m_gunTouchEnabled == enabled)
+    return;
+  m_gunTouchEnabled = enabled;
+  m_gunFingerActive = false;
+  m_gunFinger = 0;
+  m_mouseX = 0;
+  m_mouseY = 0;
+  m_mouseWheelDir = 0;
+  std::memset(m_mouseButtons, 0, sizeof(m_mouseButtons));
+  std::memset(m_mouseButtonPulseUntilMs, 0, sizeof(m_mouseButtonPulseUntilMs));
 }
 
 void AndroidInputSystem::ApplyConfig(const Util::Config::Node& config)
@@ -50,6 +74,16 @@ bool AndroidInputSystem::InitializeSystem()
   m_fingerHeldDir.clear();
   m_fingerHeldKey.clear();
   m_pulseUntilMs.clear();
+  m_mouseX = 0;
+  m_mouseY = 0;
+  m_mouseWheelDir = 0;
+  std::memset(m_mouseButtons, 0, sizeof(m_mouseButtons));
+  std::memset(m_mouseButtonPulseUntilMs, 0, sizeof(m_mouseButtonPulseUntilMs));
+  m_gunFingerActive = false;
+  m_gunFinger = 0;
+
+  SDL_GameControllerEventState(SDL_ENABLE);
+  RefreshControllers();
   return true;
 }
 
@@ -82,6 +116,8 @@ void AndroidInputSystem::PulseKeys(const DualScancode& sc, uint32_t durationMs)
 
 bool AndroidInputSystem::Poll()
 {
+  SDL_GameControllerUpdate();
+
   const uint32_t now = SDL_GetTicks();
   for (auto it = m_pulseUntilMs.begin(); it != m_pulseUntilMs.end();)
   {
@@ -95,6 +131,15 @@ bool AndroidInputSystem::Poll()
       ++it;
     }
   }
+
+  for (int i = 0; i < kMouseButtons; i++)
+  {
+    if (m_mouseButtonPulseUntilMs[i] != 0 && now >= m_mouseButtonPulseUntilMs[i])
+    {
+      m_mouseButtonPulseUntilMs[i] = 0;
+      m_mouseButtons[i] = 0;
+    }
+  }
   return true;
 }
 
@@ -102,6 +147,11 @@ void AndroidInputSystem::HandleEvent(const SDL_Event& ev)
 {
   switch (ev.type)
   {
+    case SDL_CONTROLLERDEVICEADDED:
+    case SDL_CONTROLLERDEVICEREMOVED:
+    case SDL_CONTROLLERDEVICEREMAPPED:
+      RefreshControllers();
+      break;
     case SDL_KEYDOWN:
       HandleKeyEvent(ev.key, true);
       break;
@@ -135,26 +185,18 @@ void AndroidInputSystem::HandleKeyEvent(const SDL_KeyboardEvent& key, bool down)
 
 void AndroidInputSystem::HandleControllerButtonEvent(const SDL_ControllerButtonEvent& btn, bool down)
 {
-  // Basic defaults:
-  // - Start: Start1
-  // - Right shoulder: Coin1
-  // - Back: TestA
-  // - D-pad: menu navigation
-  // - A/B/X/Y: map to common keys for future bindings
+  // Controller buttons can be mapped in Supermodel.ini via JOY mappings, but we also
+  // synthesize a few "touch-style" keys for convenience in the UI / test menu.
   DualScancode sc;
   switch (btn.button)
   {
     case SDL_CONTROLLER_BUTTON_START: sc = m_touchStart; break;
-    case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER: sc = m_touchCoin; break;
-    case SDL_CONTROLLER_BUTTON_BACK: sc = m_touchTest; break;
+    case SDL_CONTROLLER_BUTTON_BACK: sc = m_touchCoin; break;
+    case SDL_CONTROLLER_BUTTON_GUIDE: sc = m_touchService; break;
     case SDL_CONTROLLER_BUTTON_DPAD_UP: sc = m_touchJoyUp; break;
     case SDL_CONTROLLER_BUTTON_DPAD_DOWN: sc = m_touchJoyDown; break;
     case SDL_CONTROLLER_BUTTON_DPAD_LEFT: sc = m_touchJoyLeft; break;
     case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: sc = m_touchJoyRight; break;
-    case SDL_CONTROLLER_BUTTON_A: sc = {SDL_SCANCODE_Z, SDL_SCANCODE_UNKNOWN}; break;
-    case SDL_CONTROLLER_BUTTON_B: sc = {SDL_SCANCODE_X, SDL_SCANCODE_UNKNOWN}; break;
-    case SDL_CONTROLLER_BUTTON_X: sc = {SDL_SCANCODE_C, SDL_SCANCODE_UNKNOWN}; break;
-    case SDL_CONTROLLER_BUTTON_Y: sc = {SDL_SCANCODE_V, SDL_SCANCODE_UNKNOWN}; break;
     default: break;
   }
 
@@ -184,6 +226,38 @@ void AndroidInputSystem::HandleTouch(const SDL_TouchFingerEvent& tf, bool down)
     if (x > 0.75f && y > 0.75f) { PulseKeys(m_touchStart, 120); return; }
     if (x < 0.25f && y < 0.25f) { PulseKeys(m_touchService, 120); return; }
     if (x > 0.75f && y < 0.25f) { PulseKeys(m_touchTest, 120); return; }
+  }
+
+  // Lightgun/analog-gun games: use the touchscreen as an absolute "mouse" so
+  // existing MOUSE_XAXIS/MOUSE_YAXIS + MOUSE_LEFT_BUTTON mappings work without
+  // a physical mouse.
+  if (m_gunTouchEnabled)
+  {
+    if (down)
+    {
+      if (!m_gunFingerActive)
+      {
+        m_gunFingerActive = true;
+        m_gunFinger = tf.fingerId;
+        SetMousePosFromNormalized(x, y);
+        SetMouseButton(0, true); // left = trigger (held)
+      }
+      else
+      {
+        // Second touch while aiming: treat as offscreen/reload (right button pulse).
+        PulseMouseButton(2, 120);
+      }
+    }
+    else
+    {
+      if (m_gunFingerActive && tf.fingerId == m_gunFinger)
+      {
+        SetMouseButton(0, false);
+        m_gunFingerActive = false;
+        m_gunFinger = 0;
+      }
+    }
+    return;
   }
 
   // Held throttle/brake zone (right-middle): hold to accelerate/brake.
@@ -246,6 +320,15 @@ void AndroidInputSystem::HandleTouch(const SDL_TouchFingerEvent& tf, bool down)
 
 void AndroidInputSystem::HandleTouchMotion(const SDL_TouchFingerEvent& tf)
 {
+  if (m_gunTouchEnabled)
+  {
+    if (m_gunFingerActive && tf.fingerId == m_gunFinger)
+    {
+      SetMousePosFromNormalized(tf.x, tf.y);
+    }
+    return;
+  }
+
   // Update held d-pad direction.
   auto it = m_fingerHeldDir.find(tf.fingerId);
   if (it == m_fingerHeldDir.end())
@@ -266,6 +349,291 @@ void AndroidInputSystem::HandleTouchMotion(const SDL_TouchFingerEvent& tf)
   SetKeys(it->second, false);
   m_fingerHeldDir.erase(it);
   HandleTouch(tf, true);
+}
+
+int AndroidInputSystem::GetNumMice()
+{
+  return m_gunTouchEnabled ? 1 : 0;
+}
+
+const MouseDetails* AndroidInputSystem::GetMouseDetails(int mseNum)
+{
+  if (!m_gunTouchEnabled)
+    return nullptr;
+  if (mseNum == ANY_MOUSE || mseNum == 0)
+    return &m_mouseDetails;
+  return nullptr;
+}
+
+int AndroidInputSystem::GetMouseAxisValue(int mseNum, int axisNum)
+{
+  if (!m_gunTouchEnabled)
+    return 0;
+  if (mseNum != ANY_MOUSE && mseNum != 0)
+    return 0;
+
+  switch (axisNum)
+  {
+    case AXIS_X: return m_mouseX;
+    case AXIS_Y: return m_mouseY;
+    default: return 0;
+  }
+}
+
+int AndroidInputSystem::GetMouseWheelDir(int mseNum)
+{
+  if (!m_gunTouchEnabled)
+    return 0;
+  if (mseNum != ANY_MOUSE && mseNum != 0)
+    return 0;
+  return m_mouseWheelDir;
+}
+
+bool AndroidInputSystem::IsMouseButPressed(int mseNum, int butNum)
+{
+  if (!m_gunTouchEnabled)
+    return false;
+  if (mseNum != ANY_MOUSE && mseNum != 0)
+    return false;
+  if (butNum < 0 || butNum >= kMouseButtons)
+    return false;
+  return m_mouseButtons[butNum] != 0;
+}
+
+void AndroidInputSystem::SetMouseButton(int butNum, bool down)
+{
+  if (butNum < 0 || butNum >= kMouseButtons)
+    return;
+  m_mouseButtons[butNum] = down ? 1 : 0;
+  if (!down)
+    m_mouseButtonPulseUntilMs[butNum] = 0;
+}
+
+void AndroidInputSystem::PulseMouseButton(int butNum, uint32_t durationMs)
+{
+  if (butNum < 0 || butNum >= kMouseButtons)
+    return;
+  m_mouseButtons[butNum] = 1;
+  m_mouseButtonPulseUntilMs[butNum] = SDL_GetTicks() + durationMs;
+}
+
+void AndroidInputSystem::SetMousePosFromNormalized(float x, float y)
+{
+  // The emulator polls inputs with a fixed display geometry (currently 496x384).
+  // Use the same coordinate system so the core's mouse/lightgun normalization works.
+  constexpr int w = 496;
+  constexpr int h = 384;
+  const int px = (int)std::lround(std::clamp(x, 0.0f, 1.0f) * (float)(w - 1));
+  const int py = (int)std::lround(std::clamp(y, 0.0f, 1.0f) * (float)(h - 1));
+  m_mouseX = std::clamp(px, 0, w - 1);
+  m_mouseY = std::clamp(py, 0, h - 1);
+}
+
+void AndroidInputSystem::CloseControllers()
+{
+  for (auto& c : m_controllers)
+  {
+    if (c.controller)
+    {
+      SDL_GameControllerClose(c.controller);
+      c.controller = nullptr;
+    }
+  }
+  m_controllers.clear();
+}
+
+void AndroidInputSystem::RefreshControllers()
+{
+  CloseControllers();
+
+  const int n = SDL_NumJoysticks();
+  for (int i = 0; i < n; i++)
+  {
+    if (!SDL_IsGameController(i))
+      continue;
+
+    SDL_GameController* controller = SDL_GameControllerOpen(i);
+    if (!controller)
+      continue;
+
+    SDL_Joystick* js = SDL_GameControllerGetJoystick(controller);
+    if (!js)
+    {
+      SDL_GameControllerClose(controller);
+      continue;
+    }
+
+    ControllerState state;
+    state.controller = controller;
+    state.instanceId = SDL_JoystickInstanceID(js);
+
+    std::memset(&state.details, 0, sizeof(state.details));
+    const char* name = SDL_GameControllerName(controller);
+    if (!name) name = "GameController";
+    std::strncpy(state.details.name, name, MAX_NAME_LENGTH);
+    state.details.name[MAX_NAME_LENGTH] = '\0';
+
+    // Align with the desktop SDL "gamecontroller" path.
+    state.details.numAxes = 6;
+    state.details.numPOVs = 4;
+    state.details.numButtons = 17;
+    state.details.hasFFeedback = false;
+
+    for (int a = 0; a < NUM_JOY_AXES; a++)
+    {
+      state.details.hasAxis[a] = false;
+      state.details.axisHasFF[a] = false;
+      std::strncpy(state.details.axisName[a], GetDefaultAxisName(a), MAX_NAME_LENGTH);
+      state.details.axisName[a][MAX_NAME_LENGTH] = '\0';
+    }
+
+    state.details.hasAxis[AXIS_X] = true;
+    state.details.hasAxis[AXIS_Y] = true;
+    state.details.hasAxis[AXIS_Z] = true;
+    state.details.hasAxis[AXIS_RX] = true;
+    state.details.hasAxis[AXIS_RY] = true;
+    state.details.hasAxis[AXIS_RZ] = true;
+
+    m_controllers.push_back(state);
+  }
+}
+
+int AndroidInputSystem::GetNumJoysticks()
+{
+  return static_cast<int>(m_controllers.size());
+}
+
+const JoyDetails* AndroidInputSystem::GetJoyDetails(int joyNum)
+{
+  if (joyNum < 0 || joyNum >= static_cast<int>(m_controllers.size()))
+    return nullptr;
+  return &m_controllers[static_cast<size_t>(joyNum)].details;
+}
+
+int AndroidInputSystem::AxisValueFor(const ControllerState& c, int axisNum) const
+{
+  if (!c.controller)
+    return 0;
+
+  switch (axisNum)
+  {
+    case AXIS_X: return (int)SDL_GameControllerGetAxis(c.controller, SDL_CONTROLLER_AXIS_LEFTX);
+    case AXIS_Y: return (int)SDL_GameControllerGetAxis(c.controller, SDL_CONTROLLER_AXIS_LEFTY);
+    case AXIS_Z: return (int)SDL_GameControllerGetAxis(c.controller, SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+    case AXIS_RX: return (int)SDL_GameControllerGetAxis(c.controller, SDL_CONTROLLER_AXIS_RIGHTX);
+    case AXIS_RY: return (int)SDL_GameControllerGetAxis(c.controller, SDL_CONTROLLER_AXIS_RIGHTY);
+    case AXIS_RZ: return (int)SDL_GameControllerGetAxis(c.controller, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+    default: return 0;
+  }
+}
+
+bool AndroidInputSystem::PovPressedFor(const ControllerState& c, int povDir) const
+{
+  if (!c.controller)
+    return false;
+
+  switch (povDir)
+  {
+    case POV_UP: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_DPAD_UP) != 0;
+    case POV_DOWN: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_DPAD_DOWN) != 0;
+    case POV_LEFT: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_DPAD_LEFT) != 0;
+    case POV_RIGHT: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_DPAD_RIGHT) != 0;
+    default: return false;
+  }
+}
+
+bool AndroidInputSystem::ButtonPressedFor(const ControllerState& c, int butNum) const
+{
+  if (!c.controller)
+    return false;
+
+  // Match the desktop SDLInputSystem "useGameController" mapping.
+  switch (butNum)
+  {
+    case 0: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_A) != 0;
+    case 1: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_B) != 0;
+    case 2: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_X) != 0;
+    case 3: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_Y) != 0;
+    case 4: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_LEFTSHOULDER) != 0;
+    case 5: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) != 0;
+    case 6: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_BACK) != 0;
+    case 7: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_START) != 0;
+    case 8: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_LEFTSTICK) != 0;
+    case 9: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_RIGHTSTICK) != 0;
+    case 10: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_PADDLE1) != 0;
+    case 11: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_PADDLE2) != 0;
+    case 12: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_GUIDE) != 0;
+    case 13: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_PADDLE3) != 0;
+    case 14: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_PADDLE4) != 0;
+    case 15: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_MISC1) != 0;
+    case 16: return SDL_GameControllerGetButton(c.controller, SDL_CONTROLLER_BUTTON_TOUCHPAD) != 0;
+    default: return false;
+  }
+}
+
+int AndroidInputSystem::GetJoyAxisValue(int joyNum, int axisNum)
+{
+  if (m_controllers.empty())
+    return 0;
+
+  if (joyNum == ANY_JOYSTICK)
+  {
+    int best = 0;
+    for (const auto& c : m_controllers)
+    {
+      const int v = AxisValueFor(c, axisNum);
+      if (std::abs(v) > std::abs(best))
+        best = v;
+    }
+    return best;
+  }
+
+  if (joyNum < 0 || joyNum >= static_cast<int>(m_controllers.size()))
+    return 0;
+
+  return AxisValueFor(m_controllers[static_cast<size_t>(joyNum)], axisNum);
+}
+
+bool AndroidInputSystem::IsJoyPOVInDir(int joyNum, int /*povNum*/, int povDir)
+{
+  if (m_controllers.empty())
+    return false;
+
+  if (joyNum == ANY_JOYSTICK)
+  {
+    for (const auto& c : m_controllers)
+    {
+      if (PovPressedFor(c, povDir))
+        return true;
+    }
+    return false;
+  }
+
+  if (joyNum < 0 || joyNum >= static_cast<int>(m_controllers.size()))
+    return false;
+
+  return PovPressedFor(m_controllers[static_cast<size_t>(joyNum)], povDir);
+}
+
+bool AndroidInputSystem::IsJoyButPressed(int joyNum, int butNum)
+{
+  if (m_controllers.empty())
+    return false;
+
+  if (joyNum == ANY_JOYSTICK)
+  {
+    for (const auto& c : m_controllers)
+    {
+      if (ButtonPressedFor(c, butNum))
+        return true;
+    }
+    return false;
+  }
+
+  if (joyNum < 0 || joyNum >= static_cast<int>(m_controllers.size()))
+    return false;
+
+  return ButtonPressedFor(m_controllers[static_cast<size_t>(joyNum)], butNum);
 }
 
 SDL_Scancode AndroidInputSystem::ScancodeFromSupermodelKeyName(const char* keyName) const

@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <unordered_map>
+#include <string>
 #include <vector>
 
 #include "Inputs/InputSystem.h"
@@ -17,7 +18,9 @@ class AndroidInputSystem final : public CInputSystem
 {
 public:
   AndroidInputSystem();
-  ~AndroidInputSystem() override = default;
+  ~AndroidInputSystem() override;
+
+  void SetGunTouchEnabled(bool enabled);
 
   // Called from the SDL event loop (main thread).
   void HandleEvent(const SDL_Event& ev);
@@ -30,22 +33,22 @@ public:
   const char* GetKeyName(int keyIndex) override;
   bool IsKeyPressed(int /*kbdNum*/, int keyIndex) override;
 
-  int GetMouseAxisValue(int /*mseNum*/, int /*axisNum*/) override { return 0; }
-  int GetMouseWheelDir(int /*mseNum*/) override { return 0; }
-  bool IsMouseButPressed(int /*mseNum*/, int /*butNum*/) override { return false; }
+  int GetMouseAxisValue(int mseNum, int axisNum) override;
+  int GetMouseWheelDir(int mseNum) override;
+  bool IsMouseButPressed(int mseNum, int butNum) override;
 
-  int GetJoyAxisValue(int /*joyNum*/, int /*axisNum*/) override { return 0; }
-  bool IsJoyPOVInDir(int /*joyNum*/, int /*povNum*/, int /*povDir*/) override { return false; }
-  bool IsJoyButPressed(int /*joyNum*/, int /*butNum*/) override { return false; }
+  int GetJoyAxisValue(int joyNum, int axisNum) override;
+  bool IsJoyPOVInDir(int joyNum, int povNum, int povDir) override;
+  bool IsJoyButPressed(int joyNum, int butNum) override;
   bool ProcessForceFeedbackCmd(int /*joyNum*/, int /*axisNum*/, ForceFeedbackCmd /*ffCmd*/) override { return false; }
 
   int GetNumKeyboards() override { return 1; }
-  int GetNumMice() override { return 0; }
-  int GetNumJoysticks() override { return 0; }
+  int GetNumMice() override;
+  int GetNumJoysticks() override;
 
   const KeyDetails* GetKeyDetails(int /*kbdNum*/) override { return nullptr; }
-  const MouseDetails* GetMouseDetails(int /*mseNum*/) override { return nullptr; }
-  const JoyDetails* GetJoyDetails(int /*joyNum*/) override { return nullptr; }
+  const MouseDetails* GetMouseDetails(int mseNum) override;
+  const JoyDetails* GetJoyDetails(int joyNum) override;
 
   bool Poll() override;
 
@@ -54,10 +57,21 @@ public:
   void UngrabMouse() override {}
 
 private:
+  static constexpr int kMouseButtons = 5;
+
+  struct ControllerState {
+    SDL_GameController* controller = nullptr;
+    SDL_JoystickID instanceId = 0;
+    JoyDetails details{};
+  };
+
   struct DualScancode {
     SDL_Scancode a = SDL_SCANCODE_UNKNOWN;
     SDL_Scancode b = SDL_SCANCODE_UNKNOWN;
   };
+
+  void RefreshControllers();
+  void CloseControllers();
 
   void SetKey(SDL_Scancode sc, bool down);
   void PulseKey(SDL_Scancode sc, uint32_t durationMs);
@@ -68,6 +82,14 @@ private:
   void HandleControllerButtonEvent(const SDL_ControllerButtonEvent& btn, bool down);
   void HandleTouch(const SDL_TouchFingerEvent& tf, bool down);
   void HandleTouchMotion(const SDL_TouchFingerEvent& tf);
+
+  int AxisValueFor(const ControllerState& c, int axisNum) const;
+  bool ButtonPressedFor(const ControllerState& c, int butNum) const;
+  bool PovPressedFor(const ControllerState& c, int povDir) const;
+
+  void SetMouseButton(int butNum, bool down);
+  void PulseMouseButton(int butNum, uint32_t durationMs);
+  void SetMousePosFromNormalized(float x, float y);
 
   SDL_Scancode ScancodeFromSupermodelKeyName(const char* keyName) const;
   static SDL_Scancode ParseFirstKeyboardScancode(const std::string& mapping, const AndroidInputSystem& self);
@@ -88,6 +110,18 @@ private:
   DualScancode m_touchThrottle{SDL_SCANCODE_W, SDL_SCANCODE_UNKNOWN};
   DualScancode m_touchBrake{SDL_SCANCODE_S, SDL_SCANCODE_UNKNOWN};
 
+  bool m_gunTouchEnabled = false;
+  SDL_FingerID m_gunFinger = 0;
+  bool m_gunFingerActive = false;
+
+  MouseDetails m_mouseDetails{};
+  int m_mouseX = 0;
+  int m_mouseY = 0;
+  int m_mouseWheelDir = 0;
+  uint8_t m_mouseButtons[kMouseButtons]{};
+  uint32_t m_mouseButtonPulseUntilMs[kMouseButtons]{};
+
+  std::vector<ControllerState> m_controllers;
   std::vector<uint8_t> m_keys; // indexed by SDL_Scancode
   std::unordered_map<SDL_FingerID, DualScancode> m_fingerHeldDir;
   std::unordered_map<SDL_FingerID, DualScancode> m_fingerHeldKey;
