@@ -39,6 +39,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var searchResultsList: RecyclerView
     private lateinit var statusText: TextView
 
+    private lateinit var btnResolution: MaterialButton
+    private lateinit var btnWidescreen: MaterialButton
+    private lateinit var btnWideBackground: MaterialButton
+
     private lateinit var gamesAdapter: GamesAdapter
 
     private var gamesTreeUri: Uri? = null
@@ -49,6 +53,27 @@ class MainActivity : AppCompatActivity() {
 
     @Volatile
     private var scanning = false
+
+    private data class VideoSettings(
+        val xResolution: Int,
+        val yResolution: Int,
+        val wideScreen: Boolean,
+        val wideBackground: Boolean,
+    )
+
+    private data class ResolutionOption(val label: String, val x: Int, val y: Int)
+
+    private val resolutionOptions =
+        listOf(
+            ResolutionOption("Native", 496, 384),
+            ResolutionOption("2x", 992, 768),
+            ResolutionOption("3x", 1488, 1152),
+            ResolutionOption("4x", 1984, 1536),
+            ResolutionOption("5x", 2480, 1920),
+            ResolutionOption("6x", 2976, 2304),
+            ResolutionOption("7x", 3472, 2688),
+            ResolutionOption("8x", 3968, 3072),
+        )
 
     private val pickGamesFolder =
         registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -92,6 +117,9 @@ class MainActivity : AppCompatActivity() {
         val btnPickGamesFolder: MaterialButton = headerView.findViewById(R.id.btn_pick_games_folder)
         val btnPickUserFolder: MaterialButton = headerView.findViewById(R.id.btn_pick_user_folder)
         val btnRescan: MaterialButton = headerView.findViewById(R.id.btn_rescan)
+        btnResolution = headerView.findViewById(R.id.btn_resolution)
+        btnWidescreen = headerView.findViewById(R.id.btn_widescreen)
+        btnWideBackground = headerView.findViewById(R.id.btn_wide_background)
 
         gamesAdapter = GamesAdapter { item ->
             if (!item.launchable) {
@@ -110,6 +138,8 @@ class MainActivity : AppCompatActivity() {
         btnPickGamesFolder.setOnClickListener { pickGamesFolder.launch(null) }
         btnPickUserFolder.setOnClickListener { pickUserFolder.launch(null) }
         btnRescan.setOnClickListener { refreshUi() }
+
+        bindVideoSettingsUi()
 
         runCatching { searchView.setupWithSearchBar(searchBar) }
         searchBar.setOnClickListener {
@@ -140,6 +170,8 @@ class MainActivity : AppCompatActivity() {
 
         AssetInstaller.ensureInstalled(this, internalUserRoot())
 
+        applyVideoSettingsToIni(internalUserRoot(), loadVideoSettings())
+
         refreshUi()
     }
 
@@ -155,6 +187,199 @@ class MainActivity : AppCompatActivity() {
 
     private fun internalUserRoot(): File {
         return File(getExternalFilesDir(null), "super3")
+    }
+
+    private fun supermodelIniFile(internalRoot: File = internalUserRoot()): File {
+        return File(File(internalRoot, "Config"), "Supermodel.ini")
+    }
+
+    private fun loadVideoSettings(): VideoSettings {
+        val hasPrefs = prefs.contains("video_xResolution") && prefs.contains("video_yResolution")
+        if (hasPrefs) {
+            val x = prefs.getInt("video_xResolution", 496)
+            val y = prefs.getInt("video_yResolution", 384)
+            val wideScreen = prefs.getBoolean("video_wideScreen", false)
+            val wideBackground = prefs.getBoolean("video_wideBackground", false)
+            return VideoSettings(x, y, wideScreen, wideBackground)
+        }
+
+        val ini = supermodelIniFile()
+        val x = readIniInt(ini, "XResolution") ?: 496
+        val y = readIniInt(ini, "YResolution") ?: 384
+        val wideScreen = readIniBool(ini, "WideScreen") ?: false
+        val wideBackground = readIniBool(ini, "WideBackground") ?: false
+        return VideoSettings(x, y, wideScreen, wideBackground)
+    }
+
+    private fun saveVideoSettings(settings: VideoSettings) {
+        prefs.edit()
+            .putInt("video_xResolution", settings.xResolution)
+            .putInt("video_yResolution", settings.yResolution)
+            .putBoolean("video_wideScreen", settings.wideScreen)
+            .putBoolean("video_wideBackground", settings.wideBackground)
+            .apply()
+    }
+
+    private fun bindVideoSettingsUi() {
+        fun renderResolutionLabel(x: Int, y: Int): String {
+            val match = resolutionOptions.firstOrNull { it.x == x && it.y == y }
+            return if (match != null) {
+                "Resolution: ${match.label} (${match.x}x${match.y})"
+            } else {
+                "Resolution: Custom (${x}x${y})"
+            }
+        }
+
+        fun applyUi(settings: VideoSettings) {
+            btnResolution.text = renderResolutionLabel(settings.xResolution, settings.yResolution)
+            btnWidescreen.isChecked = settings.wideScreen
+            btnWideBackground.isChecked = settings.wideBackground
+        }
+
+        fun persistAndApply(settings: VideoSettings) {
+            saveVideoSettings(settings)
+            applyVideoSettingsToIni(internalUserRoot(), settings)
+            val tree = userTreeUri
+            if (tree != null) {
+                thread(name = "Super3SyncSettings") {
+                    UserDataSync.syncInternalIntoTree(this, internalUserRoot(), tree)
+                }
+            }
+        }
+
+        applyUi(loadVideoSettings())
+
+        btnResolution.setOnClickListener {
+            val cur = loadVideoSettings()
+            val curIndex = resolutionOptions.indexOfFirst { it.x == cur.xResolution && it.y == cur.yResolution }
+            val next = resolutionOptions[(curIndex + 1).coerceAtLeast(0) % resolutionOptions.size]
+            val updated = cur.copy(xResolution = next.x, yResolution = next.y)
+            applyUi(updated)
+            persistAndApply(updated)
+            Toast.makeText(this, "Resolution set to ${next.label} (${next.x}x${next.y})", Toast.LENGTH_SHORT).show()
+        }
+
+        btnWidescreen.setOnClickListener {
+            val cur = loadVideoSettings()
+            val updated = cur.copy(wideScreen = btnWidescreen.isChecked)
+            persistAndApply(updated)
+        }
+
+        btnWideBackground.setOnClickListener {
+            val cur = loadVideoSettings()
+            val updated = cur.copy(wideBackground = btnWideBackground.isChecked)
+            persistAndApply(updated)
+        }
+    }
+
+    private fun applyVideoSettingsToIni(internalRoot: File, settings: VideoSettings) {
+        val ini = supermodelIniFile(internalRoot)
+        updateIniKeys(
+            ini,
+            mapOf(
+                "XResolution" to settings.xResolution.toString(),
+                "YResolution" to settings.yResolution.toString(),
+                "WideScreen" to if (settings.wideScreen) "1" else "0",
+                "WideBackground" to if (settings.wideBackground) "1" else "0",
+            ),
+        )
+    }
+
+    private fun readIniInt(file: File, key: String): Int? {
+        return readIniString(file, key)?.trim()?.toIntOrNull()
+    }
+
+    private fun readIniBool(file: File, key: String): Boolean? {
+        val v = readIniString(file, key)?.trim()?.lowercase() ?: return null
+        return when (v) {
+            "1", "true", "yes", "on" -> true
+            "0", "false", "no", "off" -> false
+            else -> null
+        }
+    }
+
+    private fun readIniString(file: File, key: String): String? {
+        if (!file.exists()) return null
+        val lines = file.readLines()
+        val keyRegex = Regex("^\\s*${Regex.escape(key)}\\s*=\\s*(.*?)\\s*$", RegexOption.IGNORE_CASE)
+
+        var inGlobal = false
+        for (line in lines) {
+            val trimmed = line.trim()
+            if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                val name = trimmed.removePrefix("[").removeSuffix("]").trim()
+                inGlobal = name.equals("global", ignoreCase = true)
+                continue
+            }
+            if (!inGlobal) continue
+            if (trimmed.startsWith(";")) continue
+            val m = keyRegex.find(line) ?: continue
+            return m.groupValues[1]
+        }
+        return null
+    }
+
+    private fun updateIniKeys(file: File, updates: Map<String, String>) {
+        val lines = if (file.exists()) file.readLines() else emptyList()
+        val out = ArrayList<String>(lines.size + updates.size + 8)
+
+        fun isSectionHeader(s: String): Boolean {
+            val t = s.trim()
+            return t.startsWith("[") && t.endsWith("]")
+        }
+
+        fun sectionName(s: String): String {
+            return s.trim().removePrefix("[").removeSuffix("]").trim()
+        }
+
+        val globalStart = lines.indexOfFirst { isSectionHeader(it) && sectionName(it).equals("global", ignoreCase = true) }
+        if (globalStart < 0) {
+            out.addAll(lines)
+            if (out.isNotEmpty() && out.last().isNotBlank()) out.add("")
+            out.add("[ Global ]")
+            for ((k, v) in updates) {
+                out.add("$k = $v")
+            }
+            file.parentFile?.mkdirs()
+            file.writeText(out.joinToString("\n"))
+            return
+        }
+
+        val globalEnd =
+            (globalStart + 1 + lines.drop(globalStart + 1).indexOfFirst { isSectionHeader(it) })
+                .let { if (it <= globalStart) lines.size else it }
+
+        out.addAll(lines.take(globalStart + 1))
+
+        val existing = HashMap<String, Int>(updates.size)
+        for (i in (globalStart + 1) until globalEnd) {
+            val line = lines[i]
+            val trimmed = line.trim()
+            if (trimmed.startsWith(";") || trimmed.isBlank()) {
+                out.add(line)
+                continue
+            }
+            var replaced = false
+            for ((k, v) in updates) {
+                val rx = Regex("^\\s*${Regex.escape(k)}\\s*=", RegexOption.IGNORE_CASE)
+                if (rx.containsMatchIn(line)) {
+                    out.add("$k = $v")
+                    existing[k.lowercase()] = 1
+                    replaced = true
+                    break
+                }
+            }
+            if (!replaced) out.add(line)
+        }
+
+        for ((k, v) in updates) {
+            if (existing.containsKey(k.lowercase())) continue
+            out.add("$k = $v")
+        }
+
+        out.addAll(lines.drop(globalEnd))
+        file.parentFile?.mkdirs()
+        file.writeText(out.joinToString("\n"))
     }
 
     private fun persistTreePermission(uri: Uri) {
@@ -222,6 +447,8 @@ class MainActivity : AppCompatActivity() {
             if (userUri != null) {
                 UserDataSync.syncFromTreeIntoInternal(this, userUri, internalRoot)
             }
+
+            applyVideoSettingsToIni(internalRoot, loadVideoSettings())
 
             val cacheDir = File(internalRoot, "romcache")
             val required = resolveRequiredRomZips(game)
