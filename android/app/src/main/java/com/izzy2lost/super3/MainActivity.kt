@@ -125,6 +125,8 @@ class MainActivity : AppCompatActivity() {
         btnResolutionMatchDevice = headerView.findViewById(R.id.btn_resolution_match_device)
         btnWidescreen = headerView.findViewById(R.id.btn_widescreen)
         btnWideBackground = headerView.findViewById(R.id.btn_wide_background)
+        val btnShowTouchControls: MaterialButton = headerView.findViewById(R.id.btn_show_touch_controls)
+        val btnShowShifterOverlay: MaterialButton = headerView.findViewById(R.id.btn_show_shifter_overlay)
 
         gamesAdapter = GamesAdapter { item ->
             if (!item.launchable) {
@@ -145,6 +147,28 @@ class MainActivity : AppCompatActivity() {
         btnRescan.setOnClickListener { refreshUi() }
 
         bindVideoSettingsUi()
+
+        btnShowTouchControls.isChecked = prefs.getBoolean("overlay_controls_enabled", true)
+        btnShowTouchControls.setOnClickListener {
+            val enabled = btnShowTouchControls.isChecked
+            prefs.edit().putBoolean("overlay_controls_enabled", enabled).apply()
+            Toast.makeText(
+                this,
+                if (enabled) "Touch controls enabled" else "Touch controls hidden",
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+
+        btnShowShifterOverlay.isChecked = prefs.getBoolean("overlay_shifter_enabled", false)
+        btnShowShifterOverlay.setOnClickListener {
+            val enabled = btnShowShifterOverlay.isChecked
+            prefs.edit().putBoolean("overlay_shifter_enabled", enabled).apply()
+            Toast.makeText(
+                this,
+                if (enabled) "Shifter overlay enabled" else "Shifter overlay disabled",
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
 
         runCatching { searchView.setupWithSearchBar(searchBar) }
         searchBar.setOnClickListener {

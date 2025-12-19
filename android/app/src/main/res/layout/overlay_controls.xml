@@ -83,9 +83,27 @@
         app:rippleColor="@color/overlay_ripple"
         app:strokeWidth="2dp" />
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/overlay_reload"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:minHeight="0dp"
+        android:minWidth="0dp"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="10dp"
+        android:text="RELOAD"
+        android:textAllCaps="true"
+        android:textSize="12sp"
+        android:visibility="gone"
+        app:rippleColor="@color/overlay_ripple"
+        app:strokeWidth="2dp" />
+
     <LinearLayout
         android:id="@+id/overlay_pedals"
-        android:layout_width="92dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
@@ -96,8 +114,9 @@
 
         <ImageButton
             android:id="@+id/overlay_shifter"
-            android:layout_width="match_parent"
+            android:layout_width="92dp"
             android:layout_height="120dp"
+            android:layout_gravity="end"
             android:background="@drawable/overlay_ripple_rounded"
             android:contentDescription="Shifter"
             android:padding="8dp"
@@ -107,31 +126,38 @@
 
         <Space
             android:layout_width="match_parent"
-            android:layout_height="10dp" />
+            android:layout_height="6dp" />
 
-        <ImageButton
-            android:id="@+id/overlay_gas"
-            android:layout_width="match_parent"
-            android:layout_height="92dp"
-            android:background="@drawable/overlay_ripple_rounded"
-            android:contentDescription="Gas"
-            android:padding="8dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/gaspedal" />
+        <LinearLayout
+            android:id="@+id/overlay_pedal_row"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
 
-        <Space
-            android:layout_width="match_parent"
-            android:layout_height="10dp" />
+            <ImageButton
+                android:id="@+id/overlay_brake"
+                android:layout_width="92dp"
+                android:layout_height="92dp"
+                android:background="@drawable/overlay_ripple_rounded"
+                android:contentDescription="Brake"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/brakepedal" />
 
-        <ImageButton
-            android:id="@+id/overlay_brake"
-            android:layout_width="match_parent"
-            android:layout_height="92dp"
-            android:background="@drawable/overlay_ripple_rounded"
-            android:contentDescription="Brake"
-            android:padding="8dp"
-            android:scaleType="fitCenter"
-            android:src="@drawable/brakepedal" />
+            <Space
+                android:layout_width="10dp"
+                android:layout_height="match_parent" />
+
+            <ImageButton
+                android:id="@+id/overlay_gas"
+                android:layout_width="92dp"
+                android:layout_height="92dp"
+                android:background="@drawable/overlay_ripple_rounded"
+                android:contentDescription="Gas"
+                android:padding="8dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/gaspedal" />
+        </LinearLayout>
     </LinearLayout>
 
 </FrameLayout>

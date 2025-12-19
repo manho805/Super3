@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
+import com.google.android.material.button.MaterialButton
 import java.io.File
 import kotlin.concurrent.thread
 import org.libsdl.app.SDLActivity
@@ -42,6 +43,10 @@ class Super3Activity : SDLActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val overlaysEnabled = getSharedPreferences("super3_prefs", MODE_PRIVATE)
+            .getBoolean("overlay_controls_enabled", true)
+        if (!overlaysEnabled) return
+
         val root = SDLActivity.getContentView() as? RelativeLayout ?: return
         if (overlayView != null) return
 
@@ -72,7 +77,14 @@ class Super3Activity : SDLActivity() {
                 gamesXml.isNotBlank() &&
                 GameInputsIndex.hasAnyInputType(gamesXml, game, setOf("shiftupdown"))
 
-        val showShifter = hasShift4 || hasShiftUpDown
+        val isGunGame =
+            game.isNotBlank() &&
+                gamesXml.isNotBlank() &&
+                GameInputsIndex.hasAnyInputType(gamesXml, game, setOf("gun1", "gun2", "analog_gun1", "analog_gun2"))
+
+        val shifterEnabled = getSharedPreferences("super3_prefs", MODE_PRIVATE)
+            .getBoolean("overlay_shifter_enabled", false)
+        val showShifter = shifterEnabled && (hasShift4 || hasShiftUpDown)
 
         overlay.findViewById<LinearLayout>(R.id.overlay_pedals)?.visibility =
             if (isRacing) View.VISIBLE else View.GONE
@@ -82,6 +94,9 @@ class Super3Activity : SDLActivity() {
 
         overlay.findViewById<ImageButton>(R.id.overlay_shifter)?.visibility =
             if (isRacing && showShifter) View.VISIBLE else View.GONE
+
+        overlay.findViewById<MaterialButton>(R.id.overlay_reload)?.visibility =
+            if (isGunGame) View.VISIBLE else View.GONE
 
         fun nativeTouch(action: Int, fingerId: Int, x: Float, y: Float, p: Float = 1.0f) {
             SDLActivity.onNativeTouch(0, fingerId, action, x, y, p)
@@ -140,6 +155,9 @@ class Super3Activity : SDLActivity() {
         bindMomentary(R.id.overlay_start, fingerId = 1102, x = 0.50f, y = 0.90f)
         bindMomentary(R.id.overlay_service, fingerId = 1105, x = 0.10f, y = 0.10f)
         bindMomentary(R.id.overlay_test, fingerId = 1106, x = 0.90f, y = 0.10f)
+        if (isGunGame) {
+            bindMomentary(R.id.overlay_reload, fingerId = 1109, x = 0.90f, y = 0.90f)
+        }
 
         if (isRacing) {
             // Match the native pedal zone (right-middle), independent of UI placement.
@@ -185,7 +203,8 @@ class Super3Activity : SDLActivity() {
             }
 
             val shifter = overlay.findViewById<ImageButton>(R.id.overlay_shifter)
-            shifter?.setOnTouchListener { v, ev ->
+            if (showShifter) {
+                shifter?.setOnTouchListener { v, ev ->
                 val w = v.width.toFloat().coerceAtLeast(1f)
                 val h = v.height.toFloat().coerceAtLeast(1f)
                 val cx = w / 2f
@@ -228,6 +247,9 @@ class Super3Activity : SDLActivity() {
                     }
                     else -> true
                 }
+            }
+            } else {
+                shifter?.setOnTouchListener(null)
             }
         }
     }

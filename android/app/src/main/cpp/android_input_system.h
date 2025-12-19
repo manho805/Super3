@@ -23,6 +23,7 @@ public:
   void SetGunTouchEnabled(bool enabled);
   void SetVirtualWheelEnabled(bool enabled);
   void SetVirtualShifterMode(bool shift4, bool shiftUpDown);
+  void SetVirtualAnalogGunEnabled(bool enabled);
 
   // Called from the SDL event loop (main thread).
   void HandleEvent(const SDL_Event& ev);
@@ -76,7 +77,9 @@ private:
   void CloseControllers();
 
   bool UseVirtualWheel() const;
+  bool UseVirtualJoystick() const;
   void SetVirtualSteerFromEncoded(float encodedX);
+  void SetVirtualJoyFromNormalized(float x, float y);
 
   void SetKey(SDL_Scancode sc, bool down);
   void PulseKey(SDL_Scancode sc, uint32_t durationMs);
@@ -131,11 +134,14 @@ private:
   SDL_FingerID m_wheelFinger = 0;
   bool m_wheelFingerActive = false;
   int m_virtualJoyX = 0;
+  int m_virtualJoyY = 0;
   JoyDetails m_virtualJoyDetails{};
 
   bool m_virtualShifterShift4 = false;
   bool m_virtualShifterUpDown = false;
   int m_lastVirtualGear = -1;
+
+  bool m_virtualAnalogGunEnabled = false;
 
   MouseDetails m_mouseDetails{};
   int m_mouseX = 0;

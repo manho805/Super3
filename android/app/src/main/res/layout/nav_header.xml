@@ -102,6 +102,33 @@
       style="?attr/materialButtonElevatedStyle" />
 
     <com.google.android.material.textview.MaterialTextView
+      android:id="@+id/controls_title"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="16dp"
+      android:text="Controls"
+      android:textAppearance="?attr/textAppearanceTitleMedium"
+      android:textColor="?attr/colorOnPrimary" />
+
+    <com.google.android.material.button.MaterialButton
+      android:id="@+id/btn_show_touch_controls"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="12dp"
+      android:checkable="true"
+      android:text="Show touch controls"
+      style="?attr/materialButtonElevatedStyle" />
+
+    <com.google.android.material.button.MaterialButton
+      android:id="@+id/btn_show_shifter_overlay"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="12dp"
+      android:checkable="true"
+      android:text="Show shifter overlay"
+      style="?attr/materialButtonElevatedStyle" />
+
+    <com.google.android.material.textview.MaterialTextView
       android:id="@+id/games_folder_text"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"

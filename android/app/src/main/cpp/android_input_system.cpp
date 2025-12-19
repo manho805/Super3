@@ -57,6 +57,13 @@ void AndroidInputSystem::SetVirtualWheelEnabled(bool enabled)
   m_wheelFingerActive = false;
   m_wheelFinger = 0;
   m_virtualJoyX = 0;
+  m_virtualJoyY = 0;
+  if (enabled && !m_virtualAnalogGunEnabled)
+  {
+    m_virtualJoyDetails.hasAxis[AXIS_Y] = false;
+    std::strncpy(m_virtualJoyDetails.name, "Touch Wheel", MAX_NAME_LENGTH);
+    m_virtualJoyDetails.name[MAX_NAME_LENGTH] = '\0';
+  }
 }
 
 void AndroidInputSystem::SetVirtualShifterMode(bool shift4, bool shiftUpDown)
@@ -66,9 +73,31 @@ void AndroidInputSystem::SetVirtualShifterMode(bool shift4, bool shiftUpDown)
   m_lastVirtualGear = -1;
 }
 
+void AndroidInputSystem::SetVirtualAnalogGunEnabled(bool enabled)
+{
+  if (m_virtualAnalogGunEnabled == enabled)
+    return;
+  m_virtualAnalogGunEnabled = enabled;
+  m_virtualJoyDetails.hasAxis[AXIS_Y] = enabled;
+  if (enabled && !m_virtualWheelEnabled)
+    std::strncpy(m_virtualJoyDetails.name, "Touch Gun", MAX_NAME_LENGTH);
+  else if (!enabled && m_virtualWheelEnabled)
+    std::strncpy(m_virtualJoyDetails.name, "Touch Wheel", MAX_NAME_LENGTH);
+  else
+    std::strncpy(m_virtualJoyDetails.name, "Touch Controls", MAX_NAME_LENGTH);
+  m_virtualJoyDetails.name[MAX_NAME_LENGTH] = '\0';
+  m_virtualJoyX = 0;
+  m_virtualJoyY = 0;
+}
+
 bool AndroidInputSystem::UseVirtualWheel() const
 {
   return m_virtualWheelEnabled && m_controllers.empty();
+}
+
+bool AndroidInputSystem::UseVirtualJoystick() const
+{
+  return m_controllers.empty() && (m_virtualWheelEnabled || m_virtualAnalogGunEnabled);
 }
 
 void AndroidInputSystem::SetVirtualSteerFromEncoded(float encodedX)
@@ -85,6 +114,14 @@ void AndroidInputSystem::SetVirtualSteerFromEncoded(float encodedX)
   const float scaled = (std::abs(steer) - deadzone) / (1.0f - deadzone);
   const float signedScaled = (steer < 0.0f) ? -scaled : scaled;
   m_virtualJoyX = (int)std::lround(std::clamp(signedScaled, -1.0f, 1.0f) * 32767.0f);
+}
+
+void AndroidInputSystem::SetVirtualJoyFromNormalized(float x, float y)
+{
+  const float sx = std::clamp((x - 0.5f) * 2.0f, -1.0f, 1.0f);
+  const float sy = std::clamp((y - 0.5f) * 2.0f, -1.0f, 1.0f);
+  m_virtualJoyX = (int)std::lround(sx * 32767.0f);
+  m_virtualJoyY = (int)std::lround(sy * 32767.0f);
 }
 
 void AndroidInputSystem::ApplyConfig(const Util::Config::Node& config)
@@ -146,6 +183,7 @@ bool AndroidInputSystem::InitializeSystem()
   m_wheelFingerActive = false;
   m_wheelFinger = 0;
   m_virtualJoyX = 0;
+  m_virtualJoyY = 0;
   m_lastVirtualGear = -1;
 
   SDL_GameControllerEventState(SDL_ENABLE);
@@ -372,6 +410,21 @@ void AndroidInputSystem::HandleTouch(const SDL_TouchFingerEvent& tf, bool down)
     if (x > 0.75f && y < 0.25f) { PulseKeys(m_touchTest, 120); return; }
   }
 
+  // Lightgun reload button: treat a dedicated synthetic fingerId as offscreen/reload,
+  // independent of the aiming touch.
+  if (m_gunTouchEnabled && tf.fingerId == 1109)
+  {
+    if (down)
+    {
+      // Most lightgun games treat "reload" as offscreen + trigger.
+      // If the player is already holding the trigger (aim finger active), only pulse offscreen.
+      PulseMouseButton(2, 140); // right = reload/offscreen
+      if (!m_gunFingerActive)
+        PulseMouseButton(0, 80); // left = trigger pulse (only when not already held)
+    }
+    return;
+  }
+
   // Lightgun/analog-gun games: use the touchscreen as an absolute "mouse" so
   // existing MOUSE_XAXIS/MOUSE_YAXIS + MOUSE_LEFT_BUTTON mappings work without
   // a physical mouse.
@@ -384,12 +437,9 @@ void AndroidInputSystem::HandleTouch(const SDL_TouchFingerEvent& tf, bool down)
         m_gunFingerActive = true;
         m_gunFinger = tf.fingerId;
         SetMousePosFromNormalized(x, y);
+        if (m_virtualAnalogGunEnabled)
+          SetVirtualJoyFromNormalized(x, y);
         SetMouseButton(0, true); // left = trigger (held)
-      }
-      else
-      {
-        // Second touch while aiming: treat as offscreen/reload (right button pulse).
-        PulseMouseButton(2, 120);
       }
     }
     else
@@ -509,6 +559,8 @@ void AndroidInputSystem::HandleTouchMotion(const SDL_TouchFingerEvent& tf)
     if (m_gunFingerActive && tf.fingerId == m_gunFinger)
     {
       SetMousePosFromNormalized(tf.x, tf.y);
+      if (m_virtualAnalogGunEnabled)
+        SetVirtualJoyFromNormalized(tf.x, tf.y);
     }
     return;
   }
@@ -555,6 +607,15 @@ int AndroidInputSystem::GetMouseAxisValue(int mseNum, int axisNum)
     return 0;
   if (mseNum != ANY_MOUSE && mseNum != 0)
     return 0;
+
+  // For analog-gun games, prefer the virtual joystick (JOY1_XAXIS/JOY1_YAXIS).
+  // Keep the virtual mouse centered so MOUSE_XAXIS/MOUSE_YAXIS mappings don't override JOY mappings.
+  if (m_virtualAnalogGunEnabled && (axisNum == AXIS_X || axisNum == AXIS_Y))
+  {
+    const unsigned extent = (axisNum == AXIS_X) ? m_dispW : m_dispH;
+    const unsigned origin = (axisNum == AXIS_X) ? m_dispX : m_dispY;
+    return (int)(origin + extent / 2);
+  }
 
   switch (axisNum)
   {
@@ -684,14 +745,14 @@ void AndroidInputSystem::RefreshControllers()
 
 int AndroidInputSystem::GetNumJoysticks()
 {
-  if (UseVirtualWheel())
+  if (UseVirtualJoystick())
     return 1;
   return static_cast<int>(m_controllers.size());
 }
 
 const JoyDetails* AndroidInputSystem::GetJoyDetails(int joyNum)
 {
-  if (UseVirtualWheel())
+  if (UseVirtualJoystick())
   {
     if (joyNum == ANY_JOYSTICK || joyNum == 0)
       return &m_virtualJoyDetails;
@@ -766,10 +827,12 @@ bool AndroidInputSystem::ButtonPressedFor(const ControllerState& c, int butNum) 
 
 int AndroidInputSystem::GetJoyAxisValue(int joyNum, int axisNum)
 {
-  if (UseVirtualWheel())
+  if (UseVirtualJoystick())
   {
     if (axisNum == AXIS_X)
       return m_virtualJoyX;
+    if (axisNum == AXIS_Y && m_virtualJoyDetails.hasAxis[AXIS_Y])
+      return m_virtualJoyY;
     return 0;
   }
 
