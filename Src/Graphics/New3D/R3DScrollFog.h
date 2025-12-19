@@ -1,6 +1,12 @@
 #ifndef _R3DSCROLLFOG_H_
 #define _R3DSCROLLFOG_H_
 
+#ifdef __ANDROID__
+#include <GLES3/gl3.h>
+#else
+#include <GL/glew.h>
+#endif
+
 #include "Util/NewConfig.h"
 #include "VBO.h"
 

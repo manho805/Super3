@@ -174,6 +174,7 @@ struct Super3Host {
     config.Set("MusicVolume", "200");
     config.Set("LegacySoundDSP", false);
     config.Set("New3DEngine", false);
+    config.Set("New3DAccurate", false);
     config.Set("QuadRendering", false);
     config.Set("FlipStereo", false);
     // The core expects this node to exist (throws std::range_error otherwise).
@@ -573,6 +574,7 @@ struct Super3Host {
       return !!new3d;
 
     SDL_Log("Initializing New3D (GLES) ...");
+    SDL_Log("New3DAccurate=%d", config["New3DAccurate"].ValueAsDefault<bool>(false) ? 1 : 0);
     new3d = std::make_unique<New3D::CNew3D>(config, game.name);
     if (new3d->Init(xOff, yOff, xRes, yRes, totalXRes, totalYRes) != 0)
     {

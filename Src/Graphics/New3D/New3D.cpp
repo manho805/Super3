@@ -17,10 +17,8 @@
 namespace New3D {
 
 CNew3D::CNew3D(const Util::Config::Node &config, const std::string& gameName)
-	: m_r3dShader(config),
-#ifndef __ANDROID__
-	  m_r3dScrollFog(config),
-#endif
+	: m_config(config),
+	  m_r3dShader(config),
 	  m_gameName(gameName)
 {
 	m_cullingRAMLo	= nullptr;
@@ -30,6 +28,7 @@ CNew3D::CNew3D(const Util::Config::Node &config, const std::string& gameName)
 	m_textureRAM	= nullptr;
 	m_sunClamp		= true;
 	m_shadeIsSigned = true;
+	m_new3dAccurate = config["New3DAccurate"].ValueAsDefault<bool>(false);
 	m_numPolyVerts	= 3;
 	m_primType		= GL_TRIANGLES;
 
@@ -89,7 +88,23 @@ bool CNew3D::Init(unsigned xOffset, unsigned yOffset, unsigned xRes, unsigned yR
 
 	m_r3dShader.LoadShader();
 #ifndef __ANDROID__
-	m_r3dFrameBuffers.CreateFBO(totalXResParam, totalYResParam);
+	if (!m_r3dFrameBuffers)
+		m_r3dFrameBuffers = std::make_unique<R3DFrameBuffers>();
+	if (!m_r3dScrollFog)
+		m_r3dScrollFog = std::make_unique<R3DScrollFog>(m_config);
+	m_r3dFrameBuffers->CreateFBO((int)totalXResParam, (int)totalYResParam);
+#else
+	if (m_new3dAccurate) {
+		if (!m_r3dFrameBuffers)
+			m_r3dFrameBuffers = std::make_unique<R3DFrameBuffers>();
+		if (!m_r3dScrollFog)
+			m_r3dScrollFog = std::make_unique<R3DScrollFog>(m_config);
+		if (!m_r3dFrameBuffers->CreateFBO((int)totalXResParam, (int)totalYResParam)) {
+			m_r3dFrameBuffers.reset();
+			m_r3dScrollFog.reset();
+			m_new3dAccurate = false;
+		}
+	}
 #endif
 
 	glUseProgram(0);
@@ -122,7 +137,11 @@ void CNew3D::UploadTextures(unsigned level, unsigned x, unsigned y, unsigned wid
 
 void CNew3D::DrawScrollFog()
 {
-#ifndef __ANDROID__
+#ifdef __ANDROID__
+	if (!m_new3dAccurate) {
+		return;
+	}
+#endif
 	// this is my best guess at the logic based upon what games are doing
 	//
 	// ocean hunter		- every viewport has scroll fog values set. Must start with lowest priority layers as the higher ones sometimes are garbage
@@ -164,7 +183,9 @@ CheckScroll:
 						rgba[2] == n.viewport.fogParams[2]) {
 
 						glViewport(n.viewport.x, n.viewport.y, n.viewport.width, n.viewport.height);
-						m_r3dScrollFog.DrawScrollFog(rgba, n.viewport.scrollAtt, n.viewport.fogParams[6], n.viewport.spotFogColor, n.viewport.spotEllipse);
+						if (m_r3dScrollFog) {
+							m_r3dScrollFog->DrawScrollFog(rgba, n.viewport.scrollAtt, n.viewport.fogParams[6], n.viewport.spotFogColor, n.viewport.spotEllipse);
+						}
 						return;
 					}
 				}
@@ -172,7 +193,6 @@ CheckScroll:
 			}
 		}
 	}
-#endif
 }
 
 bool CNew3D::RenderScene(int priority, bool renderOverlay, Layer layer)
@@ -314,7 +334,8 @@ void CNew3D::DisableRenderStates()
 void CNew3D::RenderFrame(void)
 {
 #ifdef __ANDROID__
-	// Android/GLES: basic mesh path (no multi-pass transparency compositing yet).
+	if (!m_new3dAccurate) {
+		// Android/GLES: basic mesh path (no multi-pass transparency compositing yet).
 	for (int i = 0; i < 4; i++) {
 		m_nfPairs[i].zNear = -std::numeric_limits<float>::max();
 		m_nfPairs[i].zFar  =  std::numeric_limits<float>::max();
@@ -383,8 +404,9 @@ void CNew3D::RenderFrame(void)
 		glDepthMask(GL_TRUE);
 		DisableRenderStates();
 	}
-	return;
-#else
+		return;
+	}
+#endif
 	for (int i = 0; i < 4; i++) {
 		m_nfPairs[i].zNear = -std::numeric_limits<float>::max();
 		m_nfPairs[i].zFar  =  std::numeric_limits<float>::max();
@@ -431,7 +453,8 @@ void CNew3D::RenderFrame(void)
 		}
 	}
 
-	m_r3dFrameBuffers.SetFBO(Layer::trans12);
+	if (!m_r3dFrameBuffers) return;
+	m_r3dFrameBuffers->SetFBO(Layer::trans12);
 	glClear(GL_COLOR_BUFFER_BIT);					// wipe both trans layers
 
 	for (int pri = 0; pri <= 3; pri++) {
@@ -442,7 +465,7 @@ void CNew3D::RenderFrame(void)
 
 			bool renderOverlay = (i == 1);
 
-			m_r3dFrameBuffers.SetFBO(Layer::colour);
+			m_r3dFrameBuffers->SetFBO(Layer::colour);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 			SetRenderStates();
@@ -456,20 +479,20 @@ void CNew3D::RenderFrame(void)
 
 			DisableRenderStates();
 
-			m_r3dFrameBuffers.DrawOverTransLayers();			// mask trans layer with opaque pixels
-			m_r3dFrameBuffers.CompositeBaseLayer();				// copy opaque pixels to back buffer
+			m_r3dFrameBuffers->DrawOverTransLayers();			// mask trans layer with opaque pixels
+			m_r3dFrameBuffers->CompositeBaseLayer();				// copy opaque pixels to back buffer
 
 			SetRenderStates();
 
 			glDepthFunc(GL_LESS);								// alpha polys seem to use gl_less (ocean hunter)
 
 			m_r3dShader.DiscardAlpha		(false);			// render only translucent pixels
-			m_r3dFrameBuffers.StoreDepth	();					// save depth buffer for 1st trans pass
-			m_r3dFrameBuffers.SetFBO		(Layer::trans1);
+			m_r3dFrameBuffers->StoreDepth	();					// save depth buffer for 1st trans pass
+			m_r3dFrameBuffers->SetFBO		(Layer::trans1);
 			RenderScene						(pri, renderOverlay, Layer::trans1);
 
-			m_r3dFrameBuffers.RestoreDepth	();					// restore depth buffer, trans layers don't seem to depth test against each other
-			m_r3dFrameBuffers.SetFBO		(Layer::trans2);
+			m_r3dFrameBuffers->RestoreDepth	();					// restore depth buffer, trans layers don't seem to depth test against each other
+			m_r3dFrameBuffers->SetFBO		(Layer::trans2);
 			RenderScene						(pri, renderOverlay, Layer::trans2);
 
 			DisableRenderStates();
@@ -478,8 +501,7 @@ void CNew3D::RenderFrame(void)
 		}
 	}
 
-	m_r3dFrameBuffers.CompositeAlphaLayer();
-#endif
+	m_r3dFrameBuffers->CompositeAlphaLayer();
 }
 
 void CNew3D::BeginFrame(void)

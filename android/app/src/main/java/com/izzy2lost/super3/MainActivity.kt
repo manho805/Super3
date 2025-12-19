@@ -45,6 +45,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnResolutionMatchDevice: MaterialButton
     private lateinit var btnWidescreen: MaterialButton
     private lateinit var btnWideBackground: MaterialButton
+    private lateinit var btnEnhancedReal3d: MaterialButton
 
     private lateinit var gamesAdapter: GamesAdapter
 
@@ -62,6 +63,7 @@ class MainActivity : AppCompatActivity() {
         val yResolution: Int,
         val wideScreen: Boolean,
         val wideBackground: Boolean,
+        val enhancedReal3d: Boolean,
         val matchDevice: Boolean,
     )
 
@@ -125,6 +127,7 @@ class MainActivity : AppCompatActivity() {
         btnResolutionMatchDevice = headerView.findViewById(R.id.btn_resolution_match_device)
         btnWidescreen = headerView.findViewById(R.id.btn_widescreen)
         btnWideBackground = headerView.findViewById(R.id.btn_wide_background)
+        btnEnhancedReal3d = headerView.findViewById(R.id.btn_enhanced_real3d)
         val btnShowTouchControls: MaterialButton = headerView.findViewById(R.id.btn_show_touch_controls)
         val btnShowShifterOverlay: MaterialButton = headerView.findViewById(R.id.btn_show_shifter_overlay)
 
@@ -230,7 +233,8 @@ class MainActivity : AppCompatActivity() {
             val wideScreen = prefs.getBoolean("video_wideScreen", false)
             val wideBackground = prefs.getBoolean("video_wideBackground", false)
             val matchDevice = prefs.getBoolean("video_matchDevice", false)
-            return VideoSettings(x, y, wideScreen, wideBackground, matchDevice)
+            val enhancedReal3d = prefs.getBoolean("video_enhancedReal3d", false)
+            return VideoSettings(x, y, wideScreen, wideBackground, enhancedReal3d, matchDevice)
         }
 
         val ini = supermodelIniFile()
@@ -238,7 +242,8 @@ class MainActivity : AppCompatActivity() {
         val y = readIniInt(ini, "YResolution") ?: 384
         val wideScreen = readIniBool(ini, "WideScreen") ?: false
         val wideBackground = readIniBool(ini, "WideBackground") ?: false
-        return VideoSettings(x, y, wideScreen, wideBackground, matchDevice = false)
+        val enhancedReal3d = readIniBool(ini, "New3DAccurate") ?: false
+        return VideoSettings(x, y, wideScreen, wideBackground, enhancedReal3d, matchDevice = false)
     }
 
     private fun saveVideoSettings(settings: VideoSettings) {
@@ -247,6 +252,7 @@ class MainActivity : AppCompatActivity() {
             .putInt("video_yResolution", settings.yResolution)
             .putBoolean("video_wideScreen", settings.wideScreen)
             .putBoolean("video_wideBackground", settings.wideBackground)
+            .putBoolean("video_enhancedReal3d", settings.enhancedReal3d)
             .putBoolean("video_matchDevice", settings.matchDevice)
             .apply()
     }
@@ -271,6 +277,7 @@ class MainActivity : AppCompatActivity() {
             btnResolutionMatchDevice.isChecked = settings.matchDevice
             btnWidescreen.isChecked = settings.wideScreen
             btnWideBackground.isChecked = settings.wideBackground
+            btnEnhancedReal3d.isChecked = settings.enhancedReal3d
         }
 
         fun persistAndApply(settings: VideoSettings) {
@@ -334,6 +341,23 @@ class MainActivity : AppCompatActivity() {
             persistAndApply(updated)
             applyUi(updated)
         }
+
+        btnEnhancedReal3d.setOnClickListener {
+            val cur = loadVideoSettings()
+            val enabled = btnEnhancedReal3d.isChecked
+            val updated = cur.copy(enhancedReal3d = enabled, matchDevice = false)
+            persistAndApply(updated)
+            applyUi(updated)
+            Toast.makeText(
+                this,
+                if (enabled) {
+                    "Enhanced Real3D enabled (restart game to apply)"
+                } else {
+                    "Enhanced Real3D disabled (restart game to apply)"
+                },
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
     }
 
     private fun applyVideoSettingsToIni(internalRoot: File, settings: VideoSettings) {
@@ -345,6 +369,7 @@ class MainActivity : AppCompatActivity() {
                 "YResolution" to settings.yResolution.toString(),
                 "WideScreen" to if (settings.wideScreen) "1" else "0",
                 "WideBackground" to if (settings.wideBackground) "1" else "0",
+                "New3DAccurate" to if (settings.enhancedReal3d) "1" else "0",
             ),
         )
     }

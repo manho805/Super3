@@ -13,21 +13,24 @@ This app does **not** include any games, ROMs, BIOS files, or copyrighted game c
 - In-game pause/resume button.
 
 ## Video settings (Resolution & Widescreen)
-From the main game list, open the side menu (toolbar “menu” icon) and look under **Video**.
+From the main game list, open the side menu (toolbar "menu" icon) and look under **Video**.
 
-- **Resolution:** Native (496×384) and integer scale options (2× through 8×). Higher values look sharper but can reduce performance.
-- **Match device resolution:** Sets the internal resolution to your device’s exact pixel resolution (landscape). This also enables **Widescreen** and **Wide background**.
+- **Resolution:** Native (496x384) and integer scale options (2x through 8x). Higher values look sharper but can reduce performance.
+- **Match device resolution:** Sets the internal resolution to your device's exact pixel resolution (landscape). This also enables **Widescreen** and **Wide background**.
 - **Widescreen:** Expands the horizontal field of view (Supermodel `-wide-screen`). At very wide aspect ratios some games may cull objects at the edges.
 - **Wide background:** Stretches the 2D background layers when using widescreen (Supermodel `-wide-bg`).
+- **Enhanced Real3D (experimental):** Enables more desktop-like Real3D rendering (multi-pass transparency compositing + scroll fog). This can improve visuals in some games/areas, but may reduce performance on lower-end devices.
+
+These settings are written to `.../Android/data/<package>/files/super3/Config/Supermodel.ini` (`XResolution`, `YResolution`, `WideScreen`, `WideBackground`, `New3DAccurate`).
 
 ## Files & Storage
-- Save states and thumbnails are stored under the app’s user data directory in `Saves/` (for example: `.../Android/data/<package>/files/super3/Saves/`).
-- The app may offer an optional “sync”/export workflow using Android’s Storage Access Framework. If enabled, the app only accesses the folder(s) you explicitly choose.
+- Save states and thumbnails are stored under the app's user data directory in `Saves/` (for example: `.../Android/data/<package>/files/super3/Saves/`).
+- The app may offer an optional "sync"/export workflow using Android's Storage Access Framework. If enabled, the app only accesses the folder(s) you explicitly choose.
 
 ## Legal / Google Play Policy Notes
 - **No games included:** SUPER3 does not ship with ROMs or game data, and it is not intended to facilitate piracy.
 - **You must own the games:** Only use ROMs you are legally permitted to use in your region.
-- **Trademarks:** “SEGA” and all associated game names, trademarks, and copyrighted works are the property of their respective owners.
+- **Trademarks:** "SEGA" and all associated game names, trademarks, and copyrighted works are the property of their respective owners.
 - **Not affiliated:** This project is not affiliated with or endorsed by SEGA or any arcade hardware manufacturer.
 
 ## Privacy

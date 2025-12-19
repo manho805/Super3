@@ -39,19 +39,17 @@
 #include "Graphics/IRender3D.h"
 #include "Model.h"
 #include "Mat4.h"
+#include "Util/NewConfig.h"
 #include "R3DShader.h"
 #include "VBO.h"
 #include "R3DData.h"
 #include "Plane.h"
 #include "Vec.h"
-#ifndef __ANDROID__
 #include "R3DScrollFog.h"
-#endif
 #include "PolyHeader.h"
-#ifndef __ANDROID__
 #include "R3DFrameBuffers.h"
-#endif
 #include <mutex>
+#include <memory>
 
 namespace New3D {
 
@@ -236,6 +234,7 @@ private:
 	*/
 
 	// Misc
+	const Util::Config::Node &m_config;
 	std::string m_gameName;
 	int m_numPolyVerts;
 	GLenum m_primType;
@@ -243,6 +242,7 @@ private:
 	// GPU configuration
 	bool m_sunClamp;
 	bool m_shadeIsSigned;
+	bool m_new3dAccurate;
 
 	// Stepping
 	int		m_step;
@@ -290,10 +290,8 @@ private:
 
 	VBO m_vbo;								// large VBO to hold our poly data, start of VBO is ROM data, ram polys follow
 	R3DShader m_r3dShader;
-#ifndef __ANDROID__
-	R3DScrollFog m_r3dScrollFog;
-	R3DFrameBuffers m_r3dFrameBuffers;
-#endif
+	std::unique_ptr<R3DScrollFog> m_r3dScrollFog;
+	std::unique_ptr<R3DFrameBuffers> m_r3dFrameBuffers;
 
 	Plane m_planes[5];
 

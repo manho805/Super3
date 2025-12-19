@@ -189,7 +189,12 @@ void R3DFrameBuffers::SetFBO(Layer layer)
 	case Layer::none:
 	{
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+#ifdef __ANDROID__
+		GLenum buffers[] = { GL_BACK };
+		glDrawBuffers(countof(buffers), buffers);
+#else
 		glDrawBuffer(GL_BACK);
+#endif
 		break;
 	}
 	}
@@ -199,6 +204,43 @@ void R3DFrameBuffers::SetFBO(Layer layer)
 
 void R3DFrameBuffers::AllocShaderBase()
 {
+#ifdef __ANDROID__
+	const char *vertexShader = R"glsl(
+
+	#version 300 es
+	precision highp float;
+
+	in vec3 inVertex;
+	in vec2 inTexCoord;
+
+	out vec2 fsTexCoord;
+
+	void main(void)
+	{
+		fsTexCoord = inTexCoord;
+		gl_Position = vec4(inVertex,1.0);
+	}
+
+	)glsl";
+
+	const char *fragmentShader = R"glsl(
+
+	#version 300 es
+	precision mediump float;
+
+	uniform sampler2D tex1;
+	in vec2 fsTexCoord;
+	out vec4 oColor;
+
+	void main()
+	{
+		vec4 colBase = texture(tex1, fsTexCoord);
+		if(colBase.a < 1.0) discard;
+		oColor = colBase;
+	}
+
+	)glsl";
+#else
 	const char *vertexShader = R"glsl(
 
 	#version 120
@@ -234,15 +276,62 @@ void R3DFrameBuffers::AllocShaderBase()
 	}
 
 	)glsl";
+#endif
 
 	m_shaderBase.LoadShaders(vertexShader, fragmentShader);
-	m_shaderBase.uniformLoc[0] = m_shaderTrans.GetUniformLocation("tex1");
-	m_shaderBase.attribLoc[0] = m_shaderTrans.GetAttributeLocation("inVertex");
-	m_shaderBase.attribLoc[1] = m_shaderTrans.GetAttributeLocation("inTexCoord");
+	m_shaderBase.uniformLoc[0] = m_shaderBase.GetUniformLocation("tex1");
+	m_shaderBase.attribLoc[0] = m_shaderBase.GetAttributeLocation("inVertex");
+	m_shaderBase.attribLoc[1] = m_shaderBase.GetAttributeLocation("inTexCoord");
 }
 
 void R3DFrameBuffers::AllocShaderTrans()
 {
+#ifdef __ANDROID__
+	const char *vertexShader = R"glsl(
+
+	#version 300 es
+	precision highp float;
+
+	in vec3 inVertex;
+	in vec2 inTexCoord;
+
+	out vec2 fsTexCoord;
+
+	void main(void)
+	{
+		fsTexCoord = inTexCoord;
+		gl_Position = vec4(inVertex,1.0);
+	}
+
+	)glsl";
+
+	const char *fragmentShader = R"glsl(
+
+	#version 300 es
+	precision mediump float;
+
+	uniform sampler2D tex1;
+	uniform sampler2D tex2;
+
+	in vec2 fsTexCoord;
+	out vec4 oColor;
+
+	void main()
+	{
+		vec4 colTrans1 = texture(tex1, fsTexCoord);
+		vec4 colTrans2 = texture(tex2, fsTexCoord);
+
+		if(colTrans1.a + colTrans2.a > 0.0) {
+			vec3 col1 = colTrans1.rgb * colTrans1.a;
+			vec3 col2 = colTrans2.rgb * colTrans2.a;
+			colTrans1 = vec4((col1 + col2) / (colTrans1.a + colTrans2.a), colTrans1.a + colTrans2.a);
+		}
+
+		oColor = colTrans1;
+	}
+
+	)glsl";
+#else
 	const char *vertexShader = R"glsl(
 
 	#version 120
@@ -288,6 +377,7 @@ void R3DFrameBuffers::AllocShaderTrans()
 	}
 
 	)glsl";
+#endif
 
 	m_shaderTrans.LoadShaders(vertexShader, fragmentShader);
 
@@ -300,6 +390,48 @@ void R3DFrameBuffers::AllocShaderTrans()
 
 void R3DFrameBuffers::AllocShaderWipe()
 {
+#ifdef __ANDROID__
+	const char *vertexShader = R"glsl(
+
+	#version 300 es
+	precision highp float;
+
+	in vec3 inVertex;
+	in vec2 inTexCoord;
+
+	out vec2 fsTexCoord;
+
+	void main(void)
+	{
+		fsTexCoord = inTexCoord;
+		gl_Position = vec4(inVertex,1.0);
+	}
+
+	)glsl";
+
+	const char *fragmentShader = R"glsl(
+
+	#version 300 es
+	precision mediump float;
+
+	uniform sampler2D texColor;
+	in vec2 fsTexCoord;
+
+	layout(location=0) out vec4 oLayer1;
+	layout(location=1) out vec4 oLayer2;
+
+	void main()
+	{
+		vec4 colBase = texture(texColor, fsTexCoord);
+		if(colBase.a == 0.0) {
+			discard;
+		}
+		oLayer1 = vec4(0.0);
+		oLayer2 = vec4(0.0);
+	}
+
+	)glsl";
+#else
 	const char *vertexShader = R"glsl(
 
 	#version 120
@@ -339,13 +471,14 @@ void R3DFrameBuffers::AllocShaderWipe()
 	}
 
 	)glsl";
+#endif
 
 	m_shaderWipe.LoadShaders(vertexShader, fragmentShader);
 
-	m_shaderWipe.uniformLoc[0] = m_shaderTrans.GetUniformLocation("texColor");
+	m_shaderWipe.uniformLoc[0] = m_shaderWipe.GetUniformLocation("texColor");
 
-	m_shaderWipe.attribLoc[0] = m_shaderTrans.GetAttributeLocation("inVertex");
-	m_shaderWipe.attribLoc[1] = m_shaderTrans.GetAttributeLocation("inTexCoord");
+	m_shaderWipe.attribLoc[0] = m_shaderWipe.GetAttributeLocation("inVertex");
+	m_shaderWipe.attribLoc[1] = m_shaderWipe.GetAttributeLocation("inTexCoord");
 }
 
 void R3DFrameBuffers::Draw()
@@ -437,16 +570,16 @@ void R3DFrameBuffers::DrawOverTransLayers()
 	m_shaderWipe.EnableShader();
 	glUniform1i(m_shaderWipe.uniformLoc[0], 0);
 
-		glEnableVertexAttribArray(0);
-		glEnableVertexAttribArray(1);
+		glEnableVertexAttribArray(m_shaderWipe.attribLoc[0]);
+		glEnableVertexAttribArray(m_shaderWipe.attribLoc[1]);
 
 		glVertexAttribPointer(m_shaderWipe.attribLoc[0], 3, GL_FLOAT, GL_FALSE, sizeof(FBVertex), (void*)offsetof(FBVertex, verts));
 		glVertexAttribPointer(m_shaderWipe.attribLoc[1], 2, GL_FLOAT, GL_FALSE, sizeof(FBVertex), (void*)offsetof(FBVertex, texCoords));
 
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-		glDisableVertexAttribArray(0);
-		glDisableVertexAttribArray(1);
+		glDisableVertexAttribArray(m_shaderWipe.attribLoc[0]);
+		glDisableVertexAttribArray(m_shaderWipe.attribLoc[1]);
 
 	m_shaderWipe.DisableShader();
 
@@ -456,18 +589,18 @@ void R3DFrameBuffers::DrawOverTransLayers()
 void R3DFrameBuffers::DrawBaseLayer()
 {
 	m_shaderBase.EnableShader();
-	glUniform1i(m_shaderTrans.uniformLoc[0], 0);
+	glUniform1i(m_shaderBase.uniformLoc[0], 0);
 
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(m_shaderBase.attribLoc[0]);
+	glEnableVertexAttribArray(m_shaderBase.attribLoc[1]);
 
-	glVertexAttribPointer(m_shaderTrans.attribLoc[0], 3, GL_FLOAT, GL_FALSE, sizeof(FBVertex), (void*)offsetof(FBVertex, verts));
-	glVertexAttribPointer(m_shaderTrans.attribLoc[1], 2, GL_FLOAT, GL_FALSE, sizeof(FBVertex), (void*)offsetof(FBVertex, texCoords));
+	glVertexAttribPointer(m_shaderBase.attribLoc[0], 3, GL_FLOAT, GL_FALSE, sizeof(FBVertex), (void*)offsetof(FBVertex, verts));
+	glVertexAttribPointer(m_shaderBase.attribLoc[1], 2, GL_FLOAT, GL_FALSE, sizeof(FBVertex), (void*)offsetof(FBVertex, texCoords));
 
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-	glDisableVertexAttribArray(0);
-	glDisableVertexAttribArray(1);
+	glDisableVertexAttribArray(m_shaderBase.attribLoc[0]);
+	glDisableVertexAttribArray(m_shaderBase.attribLoc[1]);
 
 	m_shaderBase.DisableShader();
 }
@@ -478,16 +611,16 @@ void R3DFrameBuffers::DrawAlphaLayer()
 	glUniform1i(m_shaderTrans.uniformLoc[0], 1);		// tex unit 1
 	glUniform1i(m_shaderTrans.uniformLoc[1], 2);		// tex unit 2
 
-	glEnableVertexAttribArray(0);
-	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(m_shaderTrans.attribLoc[0]);
+	glEnableVertexAttribArray(m_shaderTrans.attribLoc[1]);
 
 	glVertexAttribPointer(m_shaderTrans.attribLoc[0], 3, GL_FLOAT, GL_FALSE, sizeof(FBVertex), (void*)offsetof(FBVertex, verts));
 	glVertexAttribPointer(m_shaderTrans.attribLoc[1], 2, GL_FLOAT, GL_FALSE, sizeof(FBVertex), (void*)offsetof(FBVertex, texCoords));
 
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-	glDisableVertexAttribArray(0);
-	glDisableVertexAttribArray(1);
+	glDisableVertexAttribArray(m_shaderTrans.attribLoc[0]);
+	glDisableVertexAttribArray(m_shaderTrans.attribLoc[1]);
 
 	m_shaderTrans.DisableShader();
 }
