@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/overlay_controls_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent"
+    android:clickable="false"
+    android:focusable="false"
+    android:importantForAccessibility="no">
+
+    <ImageButton
+        android:id="@+id/overlay_coin"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="16dp"
+        android:background="@drawable/overlay_ripple_circle"
+        android:contentDescription="Coin"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/coin" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/overlay_service"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_margin="12dp"
+        android:minHeight="0dp"
+        android:minWidth="0dp"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="6dp"
+        android:text="SERVICE"
+        android:textAllCaps="true"
+        android:textSize="12sp"
+        app:rippleColor="@color/overlay_ripple"
+        app:strokeWidth="2dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/overlay_test"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_margin="12dp"
+        android:minHeight="0dp"
+        android:minWidth="0dp"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="6dp"
+        android:text="TEST"
+        android:textAllCaps="true"
+        android:textSize="12sp"
+        app:rippleColor="@color/overlay_ripple"
+        app:strokeWidth="2dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/overlay_start"
+        style="?attr/materialButtonOutlinedStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="18dp"
+        android:minWidth="140dp"
+        android:text="START"
+        android:textAllCaps="true"
+        app:rippleColor="@color/overlay_ripple"
+        app:strokeWidth="2dp" />
+
+    <LinearLayout
+        android:id="@+id/overlay_pedals"
+        android:layout_width="92dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:clickable="false"
+        android:focusable="false"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <ImageButton
+            android:id="@+id/overlay_gas"
+            android:layout_width="match_parent"
+            android:layout_height="92dp"
+            android:background="@drawable/overlay_ripple_rounded"
+            android:contentDescription="Gas"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/gaspedal" />
+
+        <Space
+            android:layout_width="match_parent"
+            android:layout_height="10dp" />
+
+        <ImageButton
+            android:id="@+id/overlay_brake"
+            android:layout_width="match_parent"
+            android:layout_height="92dp"
+            android:background="@drawable/overlay_ripple_rounded"
+            android:contentDescription="Brake"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/brakepedal" />
+    </LinearLayout>
+
+</FrameLayout>

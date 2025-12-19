@@ -13,6 +13,8 @@ object AssetInstaller {
         for (dir in topLevel) {
             copyAssetTree(context, dir, File(internalUserRoot, dir))
         }
+
+        migrateSupermodelIni(File(File(internalUserRoot, "Config"), "Supermodel.ini"))
     }
 
     private fun copyAssetTree(context: Context, assetPath: String, dest: File) {
@@ -37,5 +39,24 @@ object AssetInstaller {
             copyAssetTree(context, "$assetPath/$child", File(dest, child))
         }
     }
-}
 
+    private fun migrateSupermodelIni(ini: File) {
+        if (!ini.exists()) return
+
+        val lines = runCatching { ini.readLines() }.getOrNull() ?: return
+        var changed = false
+        val updated =
+            lines.map { line ->
+                val trimmed = line.trim()
+                if (trimmed == "InputBrake = KEY_S,JOY1_ZAXIS_POS") {
+                    changed = true
+                    "InputBrake = KEY_X,JOY1_ZAXIS_POS"
+                } else {
+                    line
+                }
+            }
+
+        if (!changed) return
+        runCatching { ini.writeText(updated.joinToString(System.lineSeparator())) }
+    }
+}

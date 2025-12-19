@@ -1,6 +1,13 @@
 package com.izzy2lost.super3
 
 import android.net.Uri
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.MotionEvent
+import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.RelativeLayout
 import java.io.File
 import kotlin.concurrent.thread
 import org.libsdl.app.SDLActivity
@@ -10,6 +17,8 @@ import org.libsdl.app.SDLActivity
  * library specified by SDL_MAIN_LIBRARY (set to "super3" in the manifest).
  */
 class Super3Activity : SDLActivity() {
+    private var overlayView: View? = null
+
     override fun getLibraries(): Array<String> = arrayOf(
         "SDL2",
         "super3",
@@ -27,6 +36,105 @@ class Super3Activity : SDLActivity() {
         if (gamesXml.isNotBlank()) args.add(gamesXml)
         if (userDataRoot.isNotBlank()) args.add(userDataRoot)
         return args.toTypedArray()
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        val root = SDLActivity.getContentView() as? RelativeLayout ?: return
+        if (overlayView != null) return
+
+        val overlay = LayoutInflater.from(this).inflate(R.layout.overlay_controls, root, false)
+        overlayView = overlay
+        root.addView(
+            overlay,
+            RelativeLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+
+        val game = intent.getStringExtra("gameName").orEmpty()
+        val gamesXml = intent.getStringExtra("gamesXmlPath").orEmpty()
+        val isRacing =
+            game.isNotBlank() &&
+                gamesXml.isNotBlank() &&
+                GameInputsIndex.hasAnyInputType(gamesXml, game, setOf("vehicle", "harley"))
+
+        overlay.findViewById<LinearLayout>(R.id.overlay_pedals)?.visibility =
+            if (isRacing) View.VISIBLE else View.GONE
+
+        fun nativeTouch(action: Int, fingerId: Int, x: Float, y: Float, p: Float = 1.0f) {
+            SDLActivity.onNativeTouch(0, fingerId, action, x, y, p)
+        }
+
+        fun bindMomentary(viewId: Int, fingerId: Int, x: Float, y: Float) {
+            val v = overlay.findViewById<View>(viewId) ?: return
+            v.setOnTouchListener { _, ev ->
+                when (ev.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        v.alpha = 0.75f
+                        nativeTouch(MotionEvent.ACTION_DOWN, fingerId, x, y)
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        v.alpha = 1.0f
+                        nativeTouch(MotionEvent.ACTION_UP, fingerId, x, y)
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        v.alpha = 1.0f
+                        nativeTouch(MotionEvent.ACTION_UP, fingerId, x, y)
+                        true
+                    }
+                    else -> true
+                }
+            }
+        }
+
+        fun bindHeld(viewId: Int, fingerId: Int, x: Float, y: Float) {
+            val v = overlay.findViewById<View>(viewId) ?: return
+            v.setOnTouchListener { _, ev ->
+                when (ev.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        v.alpha = 0.75f
+                        nativeTouch(MotionEvent.ACTION_DOWN, fingerId, x, y)
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        v.alpha = 1.0f
+                        nativeTouch(MotionEvent.ACTION_UP, fingerId, x, y)
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        v.alpha = 1.0f
+                        nativeTouch(MotionEvent.ACTION_UP, fingerId, x, y)
+                        true
+                    }
+                    else -> true
+                }
+            }
+        }
+
+        // Use synthetic touch IDs that won't collide with real pointer IDs.
+        bindMomentary(R.id.overlay_coin, fingerId = 1101, x = 0.10f, y = 0.90f)
+        bindMomentary(R.id.overlay_start, fingerId = 1102, x = 0.50f, y = 0.90f)
+        bindMomentary(R.id.overlay_service, fingerId = 1105, x = 0.10f, y = 0.10f)
+        bindMomentary(R.id.overlay_test, fingerId = 1106, x = 0.90f, y = 0.10f)
+
+        if (isRacing) {
+            // Match the native pedal zone (right-middle), independent of UI placement.
+            bindHeld(R.id.overlay_gas, fingerId = 1103, x = 0.85f, y = 0.35f)
+            bindHeld(R.id.overlay_brake, fingerId = 1104, x = 0.85f, y = 0.80f)
+        }
+    }
+
+    override fun onDestroy() {
+        overlayView?.let { v ->
+            (v.parent as? ViewGroup)?.removeView(v)
+        }
+        overlayView = null
+        super.onDestroy()
     }
 
     override fun onResume() {

@@ -108,7 +108,7 @@ private:
   DualScancode m_touchSteerRight{SDL_SCANCODE_RIGHT, SDL_SCANCODE_UNKNOWN};
 
   DualScancode m_touchThrottle{SDL_SCANCODE_W, SDL_SCANCODE_UNKNOWN};
-  DualScancode m_touchBrake{SDL_SCANCODE_S, SDL_SCANCODE_UNKNOWN};
+  DualScancode m_touchBrake{SDL_SCANCODE_X, SDL_SCANCODE_UNKNOWN};
 
   bool m_gunTouchEnabled = false;
   SDL_FingerID m_gunFinger = 0;

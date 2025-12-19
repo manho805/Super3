@@ -65,7 +65,7 @@ void AndroidInputSystem::ApplyConfig(const Util::Config::Node& config)
   m_touchSteerRight = {steerRight, (steerRight != joyRight) ? joyRight : SDL_SCANCODE_UNKNOWN};
 
   m_touchThrottle.a = keySc(get("InputAccelerator", "KEY_W"), SDL_SCANCODE_W);
-  m_touchBrake.a = keySc(get("InputBrake", "KEY_S"), SDL_SCANCODE_S);
+  m_touchBrake.a = keySc(get("InputBrake", "KEY_X"), SDL_SCANCODE_X);
 }
 
 bool AndroidInputSystem::InitializeSystem()
@@ -217,13 +217,13 @@ void AndroidInputSystem::HandleTouch(const SDL_TouchFingerEvent& tf, bool down)
 
   // Tap zones (momentary):
   // - Bottom-left: Coin (KEY_5)
-  // - Bottom-right: Start (KEY_1)
+  // - Bottom-middle: Start (KEY_1)
   // - Top-left: Service (KEY_F1)
   // - Top-right: Test (KEY_F2)
   if (down)
   {
     if (x < 0.25f && y > 0.75f) { PulseKeys(m_touchCoin, 120); return; }
-    if (x > 0.75f && y > 0.75f) { PulseKeys(m_touchStart, 120); return; }
+    if (x > 0.40f && x < 0.60f && y > 0.75f) { PulseKeys(m_touchStart, 120); return; }
     if (x < 0.25f && y < 0.25f) { PulseKeys(m_touchService, 120); return; }
     if (x > 0.75f && y < 0.25f) { PulseKeys(m_touchTest, 120); return; }
   }
