@@ -73,6 +73,11 @@ private:
     SDL_Scancode b = SDL_SCANCODE_UNKNOWN;
   };
 
+  struct HeldDirKeys {
+    DualScancode primary{};
+    DualScancode secondary{};
+  };
+
   void RefreshControllers();
   void CloseControllers();
 
@@ -126,6 +131,16 @@ private:
   DualScancode m_touchShift4{SDL_SCANCODE_0, SDL_SCANCODE_UNKNOWN};
   DualScancode m_touchShiftN{SDL_SCANCODE_6, SDL_SCANCODE_UNKNOWN};
 
+  DualScancode m_touchPunch{SDL_SCANCODE_A, SDL_SCANCODE_UNKNOWN};
+  DualScancode m_touchKick{SDL_SCANCODE_S, SDL_SCANCODE_UNKNOWN};
+  DualScancode m_touchGuard{SDL_SCANCODE_D, SDL_SCANCODE_UNKNOWN};
+  DualScancode m_touchEscape{SDL_SCANCODE_F, SDL_SCANCODE_UNKNOWN};
+
+  DualScancode m_touchSpikeShift{SDL_SCANCODE_A, SDL_SCANCODE_UNKNOWN};
+  DualScancode m_touchSpikeBeat{SDL_SCANCODE_S, SDL_SCANCODE_UNKNOWN};
+  DualScancode m_touchSpikeCharge{SDL_SCANCODE_D, SDL_SCANCODE_UNKNOWN};
+  DualScancode m_touchSpikeJump{SDL_SCANCODE_F, SDL_SCANCODE_UNKNOWN};
+
   bool m_gunTouchEnabled = false;
   SDL_FingerID m_gunFinger = 0;
   bool m_gunFingerActive = false;
@@ -152,7 +167,7 @@ private:
 
   std::vector<ControllerState> m_controllers;
   std::vector<uint8_t> m_keys; // indexed by SDL_Scancode
-  std::unordered_map<SDL_FingerID, DualScancode> m_fingerHeldDir;
+  std::unordered_map<SDL_FingerID, HeldDirKeys> m_fingerHeldDir;
   std::unordered_map<SDL_FingerID, DualScancode> m_fingerHeldKey;
   std::unordered_map<SDL_Scancode, uint32_t> m_pulseUntilMs;
 };

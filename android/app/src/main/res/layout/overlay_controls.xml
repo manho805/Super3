@@ -197,4 +197,138 @@
                     android:src="@drawable/gaspedal" />
             </LinearLayout>
         </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/overlay_fight_stick"
+            android:layout_width="160dp"
+            android:layout_height="160dp"
+            android:layout_gravity="bottom|start"
+            android:layout_marginStart="32dp"
+            android:layout_marginBottom="104dp"
+            android:visibility="gone">
+
+            <View
+                android:id="@+id/overlay_fight_stick_base"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/overlay_joystick_base" />
+
+            <View
+                android:id="@+id/overlay_fight_stick_knob"
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:layout_gravity="center"
+                android:background="@drawable/overlay_joystick_knob" />
+
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/overlay_fight_buttons"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="18dp"
+            android:layout_marginBottom="64dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/overlay_fight_escape"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="62dp"
+                    android:layout_height="62dp"
+                    android:insetLeft="0dp"
+                    android:insetTop="0dp"
+                    android:insetRight="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:text="E"
+                    android:textAllCaps="true"
+                    android:textSize="16sp"
+                    app:cornerRadius="31dp"
+                    app:rippleColor="@color/overlay_ripple"
+                    app:strokeWidth="2dp" />
+
+                <Space
+                    android:layout_width="10dp"
+                    android:layout_height="match_parent" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/overlay_fight_guard"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="62dp"
+                    android:layout_height="62dp"
+                    android:insetLeft="0dp"
+                    android:insetTop="0dp"
+                    android:insetRight="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:text="G"
+                    android:textAllCaps="true"
+                    android:textSize="16sp"
+                    app:cornerRadius="31dp"
+                    app:rippleColor="@color/overlay_ripple"
+                    app:strokeWidth="2dp" />
+            </LinearLayout>
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="10dp" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/overlay_fight_kick"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="62dp"
+                    android:layout_height="62dp"
+                    android:insetLeft="0dp"
+                    android:insetTop="0dp"
+                    android:insetRight="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:text="K"
+                    android:textAllCaps="true"
+                    android:textSize="16sp"
+                    app:cornerRadius="31dp"
+                    app:rippleColor="@color/overlay_ripple"
+                    app:strokeWidth="2dp" />
+
+                <Space
+                    android:layout_width="10dp"
+                    android:layout_height="match_parent" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/overlay_fight_punch"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="62dp"
+                    android:layout_height="62dp"
+                    android:insetLeft="0dp"
+                    android:insetTop="0dp"
+                    android:insetRight="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:text="P"
+                    android:textAllCaps="true"
+                    android:textSize="16sp"
+                    app:cornerRadius="31dp"
+                    app:rippleColor="@color/overlay_ripple"
+                    app:strokeWidth="2dp" />
+            </LinearLayout>
+
+        </LinearLayout>
 </FrameLayout>

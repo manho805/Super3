@@ -165,6 +165,16 @@ void AndroidInputSystem::ApplyConfig(const Util::Config::Node& config)
   m_touchShift3.a = keySc(get("InputGearShift3", "KEY_9"), SDL_SCANCODE_9);
   m_touchShift4.a = keySc(get("InputGearShift4", "KEY_0"), SDL_SCANCODE_0);
   m_touchShiftN.a = keySc(get("InputGearShiftN", "KEY_6"), SDL_SCANCODE_6);
+
+  m_touchPunch.a = keySc(get("InputPunch", "KEY_A"), SDL_SCANCODE_A);
+  m_touchKick.a = keySc(get("InputKick", "KEY_S"), SDL_SCANCODE_S);
+  m_touchGuard.a = keySc(get("InputGuard", "KEY_D"), SDL_SCANCODE_D);
+  m_touchEscape.a = keySc(get("InputEscape", "KEY_F"), SDL_SCANCODE_F);
+
+  m_touchSpikeShift.a = keySc(get("InputShift", "KEY_A"), SDL_SCANCODE_A);
+  m_touchSpikeBeat.a = keySc(get("InputBeat", "KEY_S"), SDL_SCANCODE_S);
+  m_touchSpikeCharge.a = keySc(get("InputCharge", "KEY_D"), SDL_SCANCODE_D);
+  m_touchSpikeJump.a = keySc(get("InputJump", "KEY_F"), SDL_SCANCODE_F);
 }
 
 bool AndroidInputSystem::InitializeSystem()
@@ -318,6 +328,88 @@ void AndroidInputSystem::HandleTouch(const SDL_TouchFingerEvent& tf, bool down)
 {
   const float x = tf.x;
   const float y = tf.y;
+
+  // Fighting game action buttons (fingerId encoded from Java).
+  switch (tf.fingerId)
+  {
+    case 1110: SetKeys(m_touchPunch, down); return;
+    case 1111: SetKeys(m_touchKick, down); return;
+    case 1112: SetKeys(m_touchGuard, down); return;
+    case 1113: SetKeys(m_touchEscape, down); return;
+    case 1115: SetKeys(m_touchSpikeShift, down); return;
+    case 1116: SetKeys(m_touchSpikeBeat, down); return;
+    case 1117: SetKeys(m_touchSpikeCharge, down); return;
+    case 1118: SetKeys(m_touchSpikeJump, down); return;
+    default: break;
+  }
+
+  // Virtual fighting stick: 8-way directional based on encoded x/y in [0..1], keyed by a fixed fingerId.
+  if (tf.fingerId == 1114)
+  {
+    auto releaseHeld = [&]() {
+      auto it = m_fingerHeldDir.find(tf.fingerId);
+      if (it != m_fingerHeldDir.end())
+      {
+        SetKeys(it->second.primary, false);
+        SetKeys(it->second.secondary, false);
+        m_fingerHeldDir.erase(it);
+      }
+    };
+
+    if (!down)
+    {
+      releaseHeld();
+      return;
+    }
+
+    const float sx = std::clamp((x - 0.5f) * 2.0f, -1.0f, 1.0f);
+    const float sy = std::clamp((y - 0.5f) * 2.0f, -1.0f, 1.0f);
+    constexpr float deadzone = 0.25f;
+    if (std::abs(sx) < deadzone && std::abs(sy) < deadzone)
+    {
+      releaseHeld();
+      return;
+    }
+
+    constexpr float kPi = 3.14159265358979323846f;
+    float angle = std::atan2(-sy, sx); // y is down in normalized coords; invert for math-y up.
+    if (angle < 0.0f)
+      angle += 2.0f * kPi;
+
+    const int oct = (int)std::floor((angle + (kPi / 8.0f)) / (kPi / 4.0f)) & 7;
+    DualScancode h{};
+    DualScancode v{};
+    switch (oct)
+    {
+      case 0: h = m_touchJoyRight; break;
+      case 1: h = m_touchJoyRight; v = m_touchJoyUp; break;
+      case 2: v = m_touchJoyUp; break;
+      case 3: h = m_touchJoyLeft; v = m_touchJoyUp; break;
+      case 4: h = m_touchJoyLeft; break;
+      case 5: h = m_touchJoyLeft; v = m_touchJoyDown; break;
+      case 6: v = m_touchJoyDown; break;
+      case 7: h = m_touchJoyRight; v = m_touchJoyDown; break;
+      default: break;
+    }
+
+    releaseHeld();
+    HeldDirKeys held{};
+    if (h.a != SDL_SCANCODE_UNKNOWN || h.b != SDL_SCANCODE_UNKNOWN)
+      held.primary = h;
+    if (v.a != SDL_SCANCODE_UNKNOWN || v.b != SDL_SCANCODE_UNKNOWN)
+    {
+      if (held.primary.a == SDL_SCANCODE_UNKNOWN && held.primary.b == SDL_SCANCODE_UNKNOWN)
+        held.primary = v;
+      else
+        held.secondary = v;
+    }
+    if (held.primary.a != SDL_SCANCODE_UNKNOWN || held.primary.b != SDL_SCANCODE_UNKNOWN)
+      SetKeys(held.primary, true);
+    if (held.secondary.a != SDL_SCANCODE_UNKNOWN || held.secondary.b != SDL_SCANCODE_UNKNOWN)
+      SetKeys(held.secondary, true);
+    m_fingerHeldDir[tf.fingerId] = held;
+    return;
+  }
 
   // Virtual manual shifter (racing games): encoded in tf.x/tf.y from Java and keyed by a fixed fingerId.
   if ((m_virtualShifterShift4 || m_virtualShifterUpDown) && tf.fingerId == 1108)
@@ -487,7 +579,8 @@ void AndroidInputSystem::HandleTouch(const SDL_TouchFingerEvent& tf, bool down)
     auto it = m_fingerHeldDir.find(tf.fingerId);
     if (it != m_fingerHeldDir.end())
     {
-      SetKeys(it->second, false);
+      SetKeys(it->second.primary, false);
+      SetKeys(it->second.secondary, false);
       m_fingerHeldDir.erase(it);
     }
     return;
@@ -507,13 +600,21 @@ void AndroidInputSystem::HandleTouch(const SDL_TouchFingerEvent& tf, bool down)
 
   if (dir.a != SDL_SCANCODE_UNKNOWN || dir.b != SDL_SCANCODE_UNKNOWN)
   {
-    m_fingerHeldDir[tf.fingerId] = dir;
-    SetKeys(dir, true);
+    HeldDirKeys held{};
+    held.primary = dir;
+    m_fingerHeldDir[tf.fingerId] = held;
+    SetKeys(held.primary, true);
   }
 }
 
 void AndroidInputSystem::HandleTouchMotion(const SDL_TouchFingerEvent& tf)
 {
+  if (tf.fingerId == 1114)
+  {
+    HandleTouch(tf, true);
+    return;
+  }
+
   if (m_virtualShifterShift4 && tf.fingerId == 1108)
   {
     // Avoid accidental neutral when passing through center during motion.
@@ -582,7 +683,8 @@ void AndroidInputSystem::HandleTouchMotion(const SDL_TouchFingerEvent& tf)
   }
 
   // Release previous direction and compute a new one.
-  SetKeys(it->second, false);
+  SetKeys(it->second.primary, false);
+  SetKeys(it->second.secondary, false);
   m_fingerHeldDir.erase(it);
   HandleTouch(tf, true);
 }

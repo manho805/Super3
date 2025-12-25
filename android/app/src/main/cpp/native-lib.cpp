@@ -267,6 +267,14 @@ struct Super3Host {
     ensureKeyboardFallback("InputSteeringRight", "KEY_RIGHT");
     ensureKeyboardFallback("InputAccelerator", "KEY_W");
     ensureKeyboardFallback("InputBrake", "KEY_S");
+    ensureKeyboardFallback("InputPunch", "KEY_A");
+    ensureKeyboardFallback("InputKick", "KEY_S");
+    ensureKeyboardFallback("InputGuard", "KEY_D");
+    ensureKeyboardFallback("InputEscape", "KEY_F");
+    ensureKeyboardFallback("InputShift", "KEY_A");
+    ensureKeyboardFallback("InputBeat", "KEY_S");
+    ensureKeyboardFallback("InputCharge", "KEY_D");
+    ensureKeyboardFallback("InputJump", "KEY_F");
 
     inputSystem.ApplyConfig(config);
   }

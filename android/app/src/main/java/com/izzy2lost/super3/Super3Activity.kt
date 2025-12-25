@@ -13,6 +13,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.RelativeLayout
@@ -139,6 +140,16 @@ class Super3Activity : SDLActivity() {
                 gamesXml.isNotBlank() &&
                 GameInputsIndex.hasAnyInputType(gamesXml, game, setOf("gun1", "gun2", "analog_gun1", "analog_gun2"))
 
+        val isFighting =
+            game.isNotBlank() &&
+                gamesXml.isNotBlank() &&
+                GameInputsIndex.hasAnyInputType(gamesXml, game, setOf("fighting"))
+
+        val isSpikeout =
+            game.isNotBlank() &&
+                gamesXml.isNotBlank() &&
+                GameInputsIndex.hasAnyInputType(gamesXml, game, setOf("spikeout"))
+
         val shifterEnabled = getSharedPreferences("super3_prefs", MODE_PRIVATE)
             .getBoolean("overlay_shifter_enabled", false)
         val showShifter = shifterEnabled && (hasShift4 || hasShiftUpDown)
@@ -154,6 +165,12 @@ class Super3Activity : SDLActivity() {
 
         overlay.findViewById<MaterialButton>(R.id.overlay_reload)?.visibility =
             if (isGunGame) View.VISIBLE else View.GONE
+
+        overlay.findViewById<View>(R.id.overlay_fight_stick)?.visibility =
+            if (isFighting || isSpikeout) View.VISIBLE else View.GONE
+
+        overlay.findViewById<View>(R.id.overlay_fight_buttons)?.visibility =
+            if (isFighting || isSpikeout) View.VISIBLE else View.GONE
 
         fun nativeTouch(action: Int, fingerId: Int, x: Float, y: Float, p: Float = 1.0f) {
             SDLActivity.onNativeTouch(0, fingerId, action, x, y, p)
@@ -214,6 +231,67 @@ class Super3Activity : SDLActivity() {
         bindMomentary(R.id.overlay_test, fingerId = 1106, x = 0.90f, y = 0.10f)
         if (isGunGame) {
             bindMomentary(R.id.overlay_reload, fingerId = 1109, x = 0.90f, y = 0.90f)
+        }
+
+        if (isFighting || isSpikeout) {
+            val baseId =
+                if (isSpikeout) {
+                    1115
+                } else {
+                    1110
+                }
+
+            bindHeld(R.id.overlay_fight_punch, fingerId = baseId + 0, x = 0.90f, y = 0.55f)
+            bindHeld(R.id.overlay_fight_kick, fingerId = baseId + 1, x = 0.82f, y = 0.65f)
+            bindHeld(R.id.overlay_fight_guard, fingerId = baseId + 2, x = 0.90f, y = 0.45f)
+            bindHeld(R.id.overlay_fight_escape, fingerId = baseId + 3, x = 0.82f, y = 0.35f)
+
+            val stick = overlay.findViewById<FrameLayout>(R.id.overlay_fight_stick)
+            val knob = overlay.findViewById<View>(R.id.overlay_fight_stick_knob)
+            stick?.setOnTouchListener { v, ev ->
+                val w = v.width.toFloat().coerceAtLeast(1f)
+                val h = v.height.toFloat().coerceAtLeast(1f)
+                val cx = w / 2f
+                val cy = h / 2f
+                val dx = ((ev.x - cx) / cx).coerceIn(-1f, 1f)
+                val dy = ((ev.y - cy) / cy).coerceIn(-1f, 1f)
+
+                val radiusPx = (w.coerceAtMost(h) * 0.32f).coerceAtLeast(1f)
+                knob?.translationX = dx * radiusPx
+                knob?.translationY = dy * radiusPx
+
+                val encodedX = ((dx + 1f) / 2f).coerceIn(0f, 1f)
+                val encodedY = ((dy + 1f) / 2f).coerceIn(0f, 1f)
+
+                when (ev.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        v.alpha = 0.90f
+                        nativeTouch(MotionEvent.ACTION_DOWN, 1114, encodedX, encodedY)
+                        true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        nativeTouch(MotionEvent.ACTION_MOVE, 1114, encodedX, encodedY)
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        v.alpha = 1.0f
+                        knob?.translationX = 0f
+                        knob?.translationY = 0f
+                        nativeTouch(MotionEvent.ACTION_UP, 1114, 0.5f, 0.5f)
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        v.alpha = 1.0f
+                        knob?.translationX = 0f
+                        knob?.translationY = 0f
+                        nativeTouch(MotionEvent.ACTION_UP, 1114, 0.5f, 0.5f)
+                        true
+                    }
+                    else -> true
+                }
+            }
+        } else {
+            overlay.findViewById<View>(R.id.overlay_fight_stick)?.setOnTouchListener(null)
         }
 
         if (isRacing) {
