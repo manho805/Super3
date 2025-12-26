@@ -65,6 +65,12 @@ class MainActivity : AppCompatActivity() {
     @Volatile
     private var scanning = false
 
+    @Volatile
+    private var syncingFlyers = false
+
+    @Volatile
+    private var flyersStatusToken: Long = 0L
+
     private data class VideoSettings(
         val xResolution: Int,
         val yResolution: Int,
@@ -257,6 +263,10 @@ class MainActivity : AppCompatActivity() {
     private fun applyViewMode(mode: GameListViewMode) {
         gamesAdapter.setViewMode(mode)
 
+        if (mode == GameListViewMode.FLYERS) {
+            ensureFlyersSynced()
+        }
+
         val lm =
             when (mode) {
                 GameListViewMode.LIST -> androidx.recyclerview.widget.LinearLayoutManager(this)
@@ -283,6 +293,58 @@ class MainActivity : AppCompatActivity() {
             }
 
         gamesAdapter.submitList(buildItems(games, zipDocs, flyersDir()))
+    }
+
+    private fun ensureFlyersSynced() {
+        if (syncingFlyers) return
+
+        val dir = flyersDir()
+        val last = prefs.getLong("flyers_sync_last_ms", 0L)
+        val now = System.currentTimeMillis()
+        val hasAny = dir.exists() && (dir.listFiles()?.any { it.isFile } == true)
+        val minIntervalMs = 6L * 60L * 60L * 1000L
+        if (hasAny && now - last < minIntervalMs) return
+
+        syncingFlyers = true
+        flyersStatusToken = now
+        Toast.makeText(this, "Syncing flyers…", Toast.LENGTH_SHORT).show()
+
+        val priorStatus = statusText.text?.toString().orEmpty()
+        statusText.text = "Downloading flyers…"
+
+        thread(name = "Super3FlyerSync") {
+            val result =
+                runCatching {
+                    FlyerRepoSync.syncInto(dir) { done, total, name ->
+                        runOnUiThread {
+                            if (flyersStatusToken == now) {
+                                statusText.text = "Downloading flyers… ($done/$total) $name"
+                            }
+                        }
+                    }
+                }
+
+            runOnUiThread {
+                syncingFlyers = false
+                if (flyersStatusToken == now) {
+                    statusText.text = priorStatus
+                    flyersStatusToken = 0L
+                }
+
+                val ok = result.getOrNull()
+                if (ok == null) {
+                    Toast.makeText(this, "Flyer download failed", Toast.LENGTH_SHORT).show()
+                    return@runOnUiThread
+                }
+
+                val sync = ok
+                prefs.edit().putLong("flyers_sync_last_ms", now).apply()
+
+                if (sync.downloaded > 0) {
+                    gamesAdapter.submitList(buildItems(games, zipDocs, dir))
+                }
+            }
+        }
     }
 
     private fun loadViewMode(): GameListViewMode {

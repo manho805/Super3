@@ -29,7 +29,8 @@ These settings are written to `.../Android/data/<package>/files/super3/Config/Su
 - The app may offer an optional "sync"/export workflow using Android's Storage Access Framework. If enabled, the app only accesses the folder(s) you explicitly choose.
 
 ## Flyers
-- Flyers are installed to `.../Android/data/<package>/files/super3/Flyers/` as `<game>_front.png` and `<game>_back.png`.
+- Flyers are downloaded on-demand (when you switch to Flyer view) from `https://github.com/izzy2lost/Model3flyers`.
+- They are stored in `.../Android/data/<package>/files/super3/Flyers/` as `<game>_front.png` and `<game>_back.png`.
 - You can replace or add files in that folder to customize artwork.
 
 ## Legal / Google Play Policy Notes
@@ -39,7 +40,7 @@ These settings are written to `.../Android/data/<package>/files/super3/Config/Su
 - **Not affiliated:** This project is not affiliated with or endorsed by SEGA or any arcade hardware manufacturer.
 
 ## Privacy
-- SUPER3 is designed to run offline and does not require network access.
+- SUPER3 can run offline for emulation, but Flyer view may download artwork from GitHub.
 - The app stores emulator settings, save states, and screenshots locally on your device.
 - If you opt into selecting a user folder for syncing/export, access is limited to the folder you select via the system file picker.
 

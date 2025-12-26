@@ -823,7 +823,7 @@ uint32_t CReal3D::ReadPCIConfigSpace(unsigned device, unsigned reg, unsigned bit
 {
   uint32_t  d;
 
-  if ((bits==8))
+  if (bits == 8)
   {
     DebugLog("Real3D: %d-bit PCI read request for reg=%02X\n", bits, reg);
     return 0;
