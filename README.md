@@ -1,11 +1,12 @@
 # SUPER3
 
 SUPER3 is an open-source Sega Model 3 emulator for Android.
-It is based on the Supermodel emulator by `trzy`, with additional work derived from the `model3emu-code-sinden` fork (ARM branch).
+It is based on [Supermodel](https://github.com/trzy/Supermodel) by `trzy`, with additional work derived from the [model3emu-code-sinden (ARM branch)](https://github.com/DirtBagXon/model3emu-code-sinden/tree/arm) fork.
 
 This app does **not** include any games, ROMs, BIOS files, or copyrighted game content. You must supply your own legally obtained game ROMs.
 
 ## Features
+
 - Sega Model 3 emulation (compatibility varies by title/device).
 - On-screen touch controls (Service/Test/Coin/Start and game-specific controls).
 - Virtual on-screen steering wheel for driving games (when supported by the title).
@@ -14,6 +15,7 @@ This app does **not** include any games, ROMs, BIOS files, or copyrighted game c
 - Game flyers (front/back) in the launcher list.
 
 ## Video settings (Resolution & Widescreen)
+
 From the main game list, open the side menu (toolbar "menu" icon) and look under **Video**.
 
 - **Resolution:** Native (496x384) and integer scale options (2x through 8x). Higher values look sharper but can reduce performance.
@@ -22,33 +24,28 @@ From the main game list, open the side menu (toolbar "menu" icon) and look under
 - **Wide background:** Stretches the 2D background layers when using widescreen (Supermodel `-wide-bg`).
 - **Enhanced Real3D (experimental):** Enables more desktop-like Real3D rendering (multi-pass transparency compositing + scroll fog). This can improve visuals in some games/areas, but may reduce performance on lower-end devices.
 
-These settings are written to `.../Android/data/<package>/files/super3/Config/Supermodel.ini` (`XResolution`, `YResolution`, `WideScreen`, `WideBackground`, `New3DAccurate`).
-
 ## Files & Storage
+
 - Save states and thumbnails are stored under the app's user data directory in `Saves/` (for example: `.../Android/data/<package>/files/super3/Saves/`).
-- The app may offer an optional "sync"/export workflow using Android's Storage Access Framework. If enabled, the app only accesses the folder(s) you explicitly choose.
+- The optional sync/export workflow uses Android's Storage Access Framework, and only accesses the folder(s) you explicitly choose.
 
-## Flyers
-- Flyers are downloaded on-demand (when you switch to Flyer view) from `https://github.com/izzy2lost/Model3flyers`.
-- They are stored in `.../Android/data/<package>/files/super3/Flyers/` as `<game>_front.png` and `<game>_back.png`.
-- You can replace or add files in that folder to customize artwork.
+## Legal & Privacy
 
-## Legal / Google Play Policy Notes
-- **No games included:** SUPER3 does not ship with ROMs or game data, and it is not intended to facilitate piracy.
+- **No games included:** SUPER3 does not ship with ROMs or game data, and is not intended to facilitate piracy.
 - **You must own the games:** Only use ROMs you are legally permitted to use in your region.
 - **Trademarks:** "SEGA" and all associated game names, trademarks, and copyrighted works are the property of their respective owners.
 - **Not affiliated:** This project is not affiliated with or endorsed by SEGA or any arcade hardware manufacturer.
+- **Network:** Emulation can run offline; Flyer view may download artwork from GitHub.
+- **Storage:** Settings, save states, and screenshots are stored locally; optional sync/export is limited to the folder you choose in the system picker.
 
-## Privacy
-- SUPER3 can run offline for emulation, but Flyer view may download artwork from GitHub.
-- The app stores emulator settings, save states, and screenshots locally on your device.
-- If you opt into selecting a user folder for syncing/export, access is limited to the folder you select via the system file picker.
+## Source & Third-Party
 
-## Upstream / Credits
-- Supermodel (upstream): https://github.com/trzy/Supermodel
-- Model3Emu fork used as reference (ARM branch): https://github.com/DirtBagXon/model3emu-code-sinden/tree/arm
-- SDL2 is used for the Android shell and input/audio/video integration.
+- Source code: [https://github.com/izzy2lost/Super3](https://github.com/izzy2lost/Super3)
+- Upstream emulator: [https://github.com/trzy/Supermodel](https://github.com/trzy/Supermodel)
+- Reference fork (ARM work): [https://github.com/DirtBagXon/model3emu-code-sinden/tree/arm](https://github.com/DirtBagXon/model3emu-code-sinden/tree/arm)
+- SDL2: [https://github.com/libsdl-org/SDL](https://github.com/libsdl-org/SDL)
 
 ## License
-This project is licensed under the GNU GPL v3.0 (see `LICENSE`).
-If you distribute builds (including on Google Play), GPL requires providing the corresponding source code to recipients.
+
+This project is licensed under the [GNU GPL v3.0](LICENSE).
+If you distribute builds (including on Google Play), GPL requires providing the corresponding source code to recipients (see [Source & Third-Party](#source--third-party)).
