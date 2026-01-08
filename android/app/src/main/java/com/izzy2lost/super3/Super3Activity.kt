@@ -135,6 +135,16 @@ class Super3Activity : SDLActivity() {
                 gamesXml.isNotBlank() &&
                 GameInputsIndex.hasAnyInputType(gamesXml, game, setOf("shiftupdown"))
 
+        val hasViewChange =
+            game.isNotBlank() &&
+                gamesXml.isNotBlank() &&
+                GameInputsIndex.hasAnyInputType(gamesXml, game, setOf("viewchange"))
+
+        val hasVr4 =
+            game.isNotBlank() &&
+                gamesXml.isNotBlank() &&
+                GameInputsIndex.hasAnyInputType(gamesXml, game, setOf("vr4"))
+
         val isGunGame =
             game.isNotBlank() &&
                 gamesXml.isNotBlank() &&
@@ -190,6 +200,9 @@ class Super3Activity : SDLActivity() {
 
         overlay.findViewById<ImageButton>(R.id.overlay_shifter)?.visibility =
             if (isRacing && showShifter) View.VISIBLE else View.GONE
+
+        overlay.findViewById<View>(R.id.overlay_view)?.visibility =
+            if (isRacing && (hasViewChange || hasVr4)) View.VISIBLE else View.GONE
 
         overlay.findViewById<MaterialButton>(R.id.overlay_reload)?.visibility =
             if (isGunGame) View.VISIBLE else View.GONE
@@ -248,6 +261,37 @@ class Super3Activity : SDLActivity() {
                     MotionEvent.ACTION_CANCEL -> {
                         v.alpha = 1.0f
                         nativeTouch(MotionEvent.ACTION_UP, fingerId, x, y)
+                        true
+                    }
+                    else -> true
+                }
+            }
+        }
+
+        fun bindDynamicMomentary(viewId: Int, fingerIdProvider: () -> Int, x: Float, y: Float) {
+            val v = overlay.findViewById<View>(viewId) ?: return
+            var activeFingerId: Int? = null
+            v.setOnTouchListener { _, ev ->
+                when (ev.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        v.alpha = 0.75f
+                        val id = fingerIdProvider()
+                        activeFingerId = id
+                        nativeTouch(MotionEvent.ACTION_DOWN, id, x, y)
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        v.alpha = 1.0f
+                        val id = activeFingerId ?: fingerIdProvider()
+                        nativeTouch(MotionEvent.ACTION_UP, id, x, y)
+                        activeFingerId = null
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> {
+                        v.alpha = 1.0f
+                        val id = activeFingerId ?: fingerIdProvider()
+                        nativeTouch(MotionEvent.ACTION_UP, id, x, y)
+                        activeFingerId = null
                         true
                     }
                     else -> true
@@ -343,6 +387,26 @@ class Super3Activity : SDLActivity() {
             // Match the native pedal zone (right-middle), independent of UI placement.
             bindHeld(R.id.overlay_gas, fingerId = gasId, x = 0.85f, y = 0.35f)
             bindHeld(R.id.overlay_brake, fingerId = brakeId, x = 0.85f, y = 0.80f)
+
+            if (hasViewChange || hasVr4) {
+                var vrIndex = 0
+                bindDynamicMomentary(
+                    R.id.overlay_view,
+                    fingerIdProvider = {
+                        if (hasVr4) {
+                            val id = 1153 + (vrIndex % 4)
+                            vrIndex = (vrIndex + 1) % 4
+                            id
+                        } else {
+                            1152
+                        }
+                    },
+                    x = 0.90f,
+                    y = 0.50f,
+                )
+            } else {
+                overlay.findViewById<View>(R.id.overlay_view)?.setOnTouchListener(null)
+            }
 
             val wheel = overlay.findViewById<ImageButton>(R.id.overlay_wheel)
             if (isRacing) {

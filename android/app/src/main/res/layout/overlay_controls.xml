@@ -150,6 +150,22 @@
             android:orientation="vertical"
             android:visibility="gone">
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/overlay_view"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="92dp"
+                android:layout_height="52dp"
+                android:layout_gravity="end"
+                android:layout_marginBottom="10dp"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:text="VIEW"
+                android:textAllCaps="true"
+                android:textSize="12sp"
+                android:visibility="gone"
+                app:rippleColor="@color/overlay_ripple"
+                app:strokeWidth="2dp" />
+
             <ImageButton
                 android:id="@+id/overlay_shifter"
                 android:layout_width="92dp"

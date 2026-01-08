@@ -170,10 +170,10 @@ struct Super3Host {
     config.Set("NbSoundChannels", "4");
     config.Set("SoundFreq", "57.6");
     // Supermodel.ini commonly uses 200 as "100%".
-    config.Set("SoundVolume", "200");
-    config.Set("MusicVolume", "200");
+    config.Set("SoundVolume", "100");
+    config.Set("MusicVolume", "150");
     config.Set("LegacySoundDSP", false);
-    config.Set("New3DEngine", false);
+    config.Set("New3DEngine", true);
     config.Set("New3DAccurate", false);
     config.Set("QuadRendering", false);
     config.Set("FlipStereo", false);
@@ -275,6 +275,13 @@ struct Super3Host {
     ensureKeyboardFallback("InputBeat", "KEY_S");
     ensureKeyboardFallback("InputCharge", "KEY_D");
     ensureKeyboardFallback("InputJump", "KEY_F");
+
+    // Racing view buttons.
+    ensureKeyboardFallback("InputViewChange", "KEY_A");
+    ensureKeyboardFallback("InputVR1", "KEY_A");
+    ensureKeyboardFallback("InputVR2", "KEY_S");
+    ensureKeyboardFallback("InputVR3", "KEY_D");
+    ensureKeyboardFallback("InputVR4", "KEY_F");
 
     // Virtual-On (twin joystick) macros/buttons: keep keyboard fallbacks so touch controls work even
     // if the user remaps to joystick-only.

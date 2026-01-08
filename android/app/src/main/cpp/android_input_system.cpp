@@ -166,6 +166,12 @@ void AndroidInputSystem::ApplyConfig(const Util::Config::Node& config)
   m_touchShift4.a = keySc(get("InputGearShift4", "KEY_0"), SDL_SCANCODE_0);
   m_touchShiftN.a = keySc(get("InputGearShiftN", "KEY_6"), SDL_SCANCODE_6);
 
+  m_touchViewChange.a = keySc(get("InputViewChange", "KEY_A"), SDL_SCANCODE_A);
+  m_touchVr1.a = keySc(get("InputVR1", "KEY_A"), SDL_SCANCODE_A);
+  m_touchVr2.a = keySc(get("InputVR2", "KEY_S"), SDL_SCANCODE_S);
+  m_touchVr3.a = keySc(get("InputVR3", "KEY_D"), SDL_SCANCODE_D);
+  m_touchVr4.a = keySc(get("InputVR4", "KEY_F"), SDL_SCANCODE_F);
+
   m_touchPunch.a = keySc(get("InputPunch", "KEY_A"), SDL_SCANCODE_A);
   m_touchKick.a = keySc(get("InputKick", "KEY_S"), SDL_SCANCODE_S);
   m_touchGuard.a = keySc(get("InputGuard", "KEY_D"), SDL_SCANCODE_D);
@@ -351,6 +357,11 @@ void AndroidInputSystem::HandleTouch(const SDL_TouchFingerEvent& tf, bool down)
   // Fighting game action buttons (fingerId encoded from Java).
   switch (tf.fingerId)
   {
+    case 1152: SetKeys(m_touchViewChange, down); return;
+    case 1153: SetKeys(m_touchVr1, down); return;
+    case 1154: SetKeys(m_touchVr2, down); return;
+    case 1155: SetKeys(m_touchVr3, down); return;
+    case 1156: SetKeys(m_touchVr4, down); return;
     case 1110: SetKeys(m_touchPunch, down); return;
     case 1111: SetKeys(m_touchKick, down); return;
     case 1112: SetKeys(m_touchGuard, down); return;
