@@ -176,6 +176,12 @@ void AndroidInputSystem::ApplyConfig(const Util::Config::Node& config)
   m_touchSpikeCharge.a = keySc(get("InputCharge", "KEY_D"), SDL_SCANCODE_D);
   m_touchSpikeJump.a = keySc(get("InputJump", "KEY_F"), SDL_SCANCODE_F);
 
+  m_touchTwinJump.a = keySc(get("InputTwinJoyJump", "KEY_E"), SDL_SCANCODE_E);
+  {
+    const SDL_Scancode turbo1 = keySc(get("InputTwinJoyTurbo1", "KEY_Z"), SDL_SCANCODE_Z);
+    m_touchTwinBoost = {turbo1, SDL_SCANCODE_UNKNOWN};
+  }
+
   m_touchFishingCast.a = keySc(get("InputFishingCast", "KEY_Z"), SDL_SCANCODE_Z);
   m_touchFishingSelect.a = keySc(get("InputFishingSelect", "KEY_X"), SDL_SCANCODE_X);
   m_touchFishingReel.a = keySc(get("InputFishingReel", "KEY_SPACE"), SDL_SCANCODE_SPACE);
@@ -353,6 +359,8 @@ void AndroidInputSystem::HandleTouch(const SDL_TouchFingerEvent& tf, bool down)
     case 1116: SetKeys(m_touchSpikeBeat, down); return;
     case 1117: SetKeys(m_touchSpikeCharge, down); return;
     case 1118: SetKeys(m_touchSpikeJump, down); return;
+    case 1150: SetKeys(m_touchTwinJump, down); return;
+    case 1151: SetKeys(m_touchTwinBoost, down); return;
     case 1120: SetKeys(m_touchFishingCast, down); return;
     case 1121: SetKeys(m_touchFishingSelect, down); return;
     case 1122: SetKeys(m_touchFishingReel, down); return;

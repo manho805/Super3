@@ -141,6 +141,11 @@ private:
   DualScancode m_touchSpikeCharge{SDL_SCANCODE_D, SDL_SCANCODE_UNKNOWN};
   DualScancode m_touchSpikeJump{SDL_SCANCODE_F, SDL_SCANCODE_UNKNOWN};
 
+  // Virtual-On (twin joystick) macros/buttons.
+  DualScancode m_touchTwinJump{SDL_SCANCODE_E, SDL_SCANCODE_UNKNOWN};
+  // Map a single "Boost" button to Turbo1 by default (Virtual-On has separate left/right turbo buttons).
+  DualScancode m_touchTwinBoost{SDL_SCANCODE_Z, SDL_SCANCODE_UNKNOWN};
+
   DualScancode m_touchFishingCast{SDL_SCANCODE_Z, SDL_SCANCODE_UNKNOWN};
   DualScancode m_touchFishingSelect{SDL_SCANCODE_X, SDL_SCANCODE_UNKNOWN};
   DualScancode m_touchFishingReel{SDL_SCANCODE_SPACE, SDL_SCANCODE_UNKNOWN};

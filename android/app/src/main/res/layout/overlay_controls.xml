@@ -330,5 +330,60 @@
                     app:strokeWidth="2dp" />
             </LinearLayout>
 
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="12dp" />
+
+            <LinearLayout
+                android:id="@+id/overlay_vo_row"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end"
+                android:visibility="gone">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/overlay_vo_jump"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="62dp"
+                    android:layout_height="62dp"
+                    android:contentDescription="Jump"
+                    android:insetLeft="0dp"
+                    android:insetTop="0dp"
+                    android:insetRight="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:text="JMP"
+                    android:textAllCaps="true"
+                    android:textSize="14sp"
+                    app:cornerRadius="31dp"
+                    app:rippleColor="@color/overlay_ripple"
+                    app:strokeWidth="2dp" />
+
+                <Space
+                    android:layout_width="10dp"
+                    android:layout_height="match_parent" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/overlay_vo_boost"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="62dp"
+                    android:layout_height="62dp"
+                    android:contentDescription="Boost"
+                    android:insetLeft="0dp"
+                    android:insetTop="0dp"
+                    android:insetRight="0dp"
+                    android:insetBottom="0dp"
+                    android:minWidth="0dp"
+                    android:minHeight="0dp"
+                    android:text="BST"
+                    android:textAllCaps="true"
+                    android:textSize="14sp"
+                    app:cornerRadius="31dp"
+                    app:rippleColor="@color/overlay_ripple"
+                    app:strokeWidth="2dp" />
+            </LinearLayout>
+
         </LinearLayout>
 </FrameLayout>

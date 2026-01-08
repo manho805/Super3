@@ -276,6 +276,21 @@ struct Super3Host {
     ensureKeyboardFallback("InputCharge", "KEY_D");
     ensureKeyboardFallback("InputJump", "KEY_F");
 
+    // Virtual-On (twin joystick) macros/buttons: keep keyboard fallbacks so touch controls work even
+    // if the user remaps to joystick-only.
+    ensureKeyboardFallback("InputTwinJoyTurnLeft", "KEY_Q");
+    ensureKeyboardFallback("InputTwinJoyTurnRight", "KEY_W");
+    ensureKeyboardFallback("InputTwinJoyForward", "KEY_UP");
+    ensureKeyboardFallback("InputTwinJoyReverse", "KEY_DOWN");
+    ensureKeyboardFallback("InputTwinJoyStrafeLeft", "KEY_LEFT");
+    ensureKeyboardFallback("InputTwinJoyStrafeRight", "KEY_RIGHT");
+    ensureKeyboardFallback("InputTwinJoyJump", "KEY_E");
+    ensureKeyboardFallback("InputTwinJoyCrouch", "KEY_R");
+    ensureKeyboardFallback("InputTwinJoyShot1", "KEY_A");
+    ensureKeyboardFallback("InputTwinJoyShot2", "KEY_S");
+    ensureKeyboardFallback("InputTwinJoyTurbo1", "KEY_Z");
+    ensureKeyboardFallback("InputTwinJoyTurbo2", "KEY_X");
+
     inputSystem.ApplyConfig(config);
   }
 

@@ -143,7 +143,12 @@ class Super3Activity : SDLActivity() {
         val isSoccer =
             game.isNotBlank() &&
                 gamesXml.isNotBlank() &&
-                GameInputsIndex.hasAnyInputType(gamesXml, game, setOf("soccer", "twin_joysticks"))
+                GameInputsIndex.hasAnyInputType(gamesXml, game, setOf("soccer"))
+
+        val isTwinJoysticks =
+            game.isNotBlank() &&
+                gamesXml.isNotBlank() &&
+                GameInputsIndex.hasAnyInputType(gamesXml, game, setOf("twin_joysticks"))
 
         val isFishing =
             game.isNotBlank() &&
@@ -170,7 +175,7 @@ class Super3Activity : SDLActivity() {
                 gamesXml.isNotBlank() &&
                 GameInputsIndex.hasAnyInputType(gamesXml, game, setOf("spikeout"))
 
-        val showFightButtons = isFighting || isSpikeout || isSoccer || isFishing || isSki
+        val showFightButtons = isFighting || isSpikeout || isSoccer || isTwinJoysticks || isFishing || isSki
         val showFightStick = showFightButtons || isMagTruck
 
         val shifterEnabled = getSharedPreferences("super3_prefs", MODE_PRIVATE)
@@ -194,6 +199,9 @@ class Super3Activity : SDLActivity() {
 
         overlay.findViewById<View>(R.id.overlay_fight_buttons)?.visibility =
             if (showFightButtons) View.VISIBLE else View.GONE
+
+        overlay.findViewById<View>(R.id.overlay_vo_row)?.visibility =
+            if (isTwinJoysticks) View.VISIBLE else View.GONE
 
         fun nativeTouch(action: Int, fingerId: Int, x: Float, y: Float, p: Float = 1.0f) {
             SDLActivity.onNativeTouch(0, fingerId, action, x, y, p)
@@ -272,6 +280,11 @@ class Super3Activity : SDLActivity() {
             bindHeld(R.id.overlay_fight_kick, fingerId = baseId + 1, x = 0.82f, y = 0.65f)
             bindHeld(R.id.overlay_fight_guard, fingerId = baseId + 2, x = 0.90f, y = 0.45f)
             bindHeld(R.id.overlay_fight_escape, fingerId = baseId + 3, x = 0.82f, y = 0.35f)
+        }
+
+        if (isTwinJoysticks) {
+            bindHeld(R.id.overlay_vo_jump, fingerId = 1150, x = 0.85f, y = 0.60f)
+            bindHeld(R.id.overlay_vo_boost, fingerId = 1151, x = 0.92f, y = 0.60f)
         }
 
         if (showFightStick) {
