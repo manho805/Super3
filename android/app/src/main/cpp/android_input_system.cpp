@@ -56,7 +56,7 @@ void AndroidInputSystem::SetVirtualWheelEnabled(bool enabled)
   m_virtualWheelEnabled = enabled;
   m_wheelFingerActive = false;
   m_wheelFinger = 0;
-  m_virtualJoyX = 0;
+  m_virtualJoyX.store(0, std::memory_order_relaxed);
   m_virtualJoyY = 0;
   if (enabled && !m_virtualAnalogGunEnabled)
   {
@@ -86,7 +86,7 @@ void AndroidInputSystem::SetVirtualAnalogGunEnabled(bool enabled)
   else
     std::strncpy(m_virtualJoyDetails.name, "Touch Controls", MAX_NAME_LENGTH);
   m_virtualJoyDetails.name[MAX_NAME_LENGTH] = '\0';
-  m_virtualJoyX = 0;
+  m_virtualJoyX.store(0, std::memory_order_relaxed);
   m_virtualJoyY = 0;
 }
 
@@ -103,24 +103,37 @@ bool AndroidInputSystem::UseVirtualJoystick() const
 void AndroidInputSystem::SetVirtualSteerFromEncoded(float encodedX)
 {
   // encodedX comes from Java as [(steer+1)/2], where steer is in [-1,1].
-  const float steer = std::clamp((encodedX - 0.5f) * 2.0f, -1.0f, 1.0f);
+  SetVirtualSteerFromSteer((encodedX - 0.5f) * 2.0f);
+}
+
+void AndroidInputSystem::SetVirtualSteerFromSteer(float steer)
+{
+  steer = std::clamp(steer, -1.0f, 1.0f);
   constexpr float deadzone = 0.08f;
   if (std::abs(steer) < deadzone)
   {
-    m_virtualJoyX = 0;
+    m_virtualJoyX.store(0, std::memory_order_relaxed);
     return;
   }
 
   const float scaled = (std::abs(steer) - deadzone) / (1.0f - deadzone);
   const float signedScaled = (steer < 0.0f) ? -scaled : scaled;
-  m_virtualJoyX = (int)std::lround(std::clamp(signedScaled, -1.0f, 1.0f) * 32767.0f);
+  m_virtualJoyX.store(
+    (int)std::lround(std::clamp(signedScaled, -1.0f, 1.0f) * 32767.0f),
+    std::memory_order_relaxed
+  );
+}
+
+void AndroidInputSystem::SetGyroSteer(float steer)
+{
+  SetVirtualSteerFromSteer(steer);
 }
 
 void AndroidInputSystem::SetVirtualJoyFromNormalized(float x, float y)
 {
   const float sx = std::clamp((x - 0.5f) * 2.0f, -1.0f, 1.0f);
   const float sy = std::clamp((y - 0.5f) * 2.0f, -1.0f, 1.0f);
-  m_virtualJoyX = (int)std::lround(sx * 32767.0f);
+  m_virtualJoyX.store((int)std::lround(sx * 32767.0f), std::memory_order_relaxed);
   m_virtualJoyY = (int)std::lround(sy * 32767.0f);
 }
 
@@ -217,7 +230,7 @@ bool AndroidInputSystem::InitializeSystem()
   m_gunFinger = 0;
   m_wheelFingerActive = false;
   m_wheelFinger = 0;
-  m_virtualJoyX = 0;
+  m_virtualJoyX.store(0, std::memory_order_relaxed);
   m_virtualJoyY = 0;
   m_lastVirtualGear = -1;
 
@@ -989,7 +1002,7 @@ int AndroidInputSystem::GetJoyAxisValue(int joyNum, int axisNum)
   if (UseVirtualJoystick())
   {
     if (axisNum == AXIS_X)
-      return m_virtualJoyX;
+      return m_virtualJoyX.load(std::memory_order_relaxed);
     if (axisNum == AXIS_Y && m_virtualJoyDetails.hasAxis[AXIS_Y])
       return m_virtualJoyY;
     return 0;

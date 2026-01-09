@@ -986,3 +986,13 @@ Java_com_izzy2lost_super3_Super3Activity_nativeGetLoadedGameName(JNIEnv* env, jo
     return nullptr;
   return env->NewStringUTF(g_host->game.name.c_str());
 }
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_izzy2lost_super3_Super3Activity_nativeSetGyroSteer(JNIEnv*, jobject, jfloat steer)
+{
+  if (!g_host)
+    return JNI_FALSE;
+  const float clamped = std::clamp((float)steer, -1.0f, 1.0f);
+  g_host->inputSystem.SetGyroSteer(clamped);
+  return JNI_TRUE;
+}

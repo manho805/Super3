@@ -137,6 +137,23 @@
       android:text="Show shifter overlay"
       style="?attr/materialButtonElevatedStyle" />
 
+    <com.google.android.material.button.MaterialButton
+      android:id="@+id/btn_gyro_steering"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="12dp"
+      android:checkable="true"
+      android:text="Gyro steering (tilt to steer)"
+      style="?attr/materialButtonElevatedStyle" />
+
+    <com.google.android.material.button.MaterialButton
+      android:id="@+id/btn_gyro_sensitivity"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="12dp"
+      android:text="Gyro sensitivity: Normal"
+      style="?attr/materialButtonElevatedStyle" />
+
     <com.google.android.material.textview.MaterialTextView
       android:id="@+id/games_folder_text"
       android:layout_width="match_parent"

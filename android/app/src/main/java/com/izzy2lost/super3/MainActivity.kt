@@ -169,6 +169,8 @@ class MainActivity : AppCompatActivity() {
         btnEnhancedReal3d = headerView.findViewById(R.id.btn_enhanced_real3d)
         val btnShowTouchControls: MaterialButton = headerView.findViewById(R.id.btn_show_touch_controls)
         val btnShowShifterOverlay: MaterialButton = headerView.findViewById(R.id.btn_show_shifter_overlay)
+        val btnGyroSteering: MaterialButton = headerView.findViewById(R.id.btn_gyro_steering)
+        val btnGyroSensitivity: MaterialButton = headerView.findViewById(R.id.btn_gyro_sensitivity)
 
         gamesAdapter = GamesAdapter { item ->
             if (!item.launchable) {
@@ -215,6 +217,38 @@ class MainActivity : AppCompatActivity() {
                 if (enabled) "Shifter overlay enabled" else "Shifter overlay disabled",
                 Toast.LENGTH_SHORT,
             ).show()
+        }
+
+        btnGyroSteering.isChecked = prefs.getBoolean("gyro_steering_enabled", false)
+        btnGyroSteering.setOnClickListener {
+            val enabled = btnGyroSteering.isChecked
+            prefs.edit().putBoolean("gyro_steering_enabled", enabled).apply()
+            Toast.makeText(
+                this,
+                if (enabled) "Gyro steering enabled (restart game to apply)" else "Gyro steering disabled",
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+
+        data class GyroPreset(val label: String, val scale: Float)
+        val gyroPresets = listOf(
+            GyroPreset("Less", 0.65f),
+            GyroPreset("Normal", 1.0f),
+            GyroPreset("More", 1.35f),
+        )
+        fun updateGyroSensitivityLabel() {
+            val cur = prefs.getFloat("gyro_steering_sensitivity", 1.0f)
+            val match = gyroPresets.minByOrNull { kotlin.math.abs(it.scale - cur) } ?: gyroPresets[1]
+            btnGyroSensitivity.text = "Gyro sensitivity: ${match.label}"
+        }
+        updateGyroSensitivityLabel()
+        btnGyroSensitivity.setOnClickListener {
+            val cur = prefs.getFloat("gyro_steering_sensitivity", 1.0f)
+            val idx = gyroPresets.indexOfFirst { kotlin.math.abs(it.scale - cur) < 0.01f }.let { if (it < 0) 1 else it }
+            val next = gyroPresets[(idx + 1) % gyroPresets.size]
+            prefs.edit().putFloat("gyro_steering_sensitivity", next.scale).apply()
+            updateGyroSensitivityLabel()
+            Toast.makeText(this, "Gyro sensitivity: ${next.label} (restart game to apply)", Toast.LENGTH_SHORT).show()
         }
 
         runCatching { searchView.setupWithSearchBar(searchBar) }

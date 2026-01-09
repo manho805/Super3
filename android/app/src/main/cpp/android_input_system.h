@@ -2,6 +2,7 @@
 
 #include <SDL.h>
 
+#include <atomic>
 #include <cstdint>
 #include <unordered_map>
 #include <string>
@@ -24,6 +25,7 @@ public:
   void SetVirtualWheelEnabled(bool enabled);
   void SetVirtualShifterMode(bool shift4, bool shiftUpDown);
   void SetVirtualAnalogGunEnabled(bool enabled);
+  void SetGyroSteer(float steer); // [-1..1]
 
   // Called from the SDL event loop (main thread).
   void HandleEvent(const SDL_Event& ev);
@@ -84,6 +86,7 @@ private:
   bool UseVirtualWheel() const;
   bool UseVirtualJoystick() const;
   void SetVirtualSteerFromEncoded(float encodedX);
+  void SetVirtualSteerFromSteer(float steer);
   void SetVirtualJoyFromNormalized(float x, float y);
 
   void SetKey(SDL_Scancode sc, bool down);
@@ -172,7 +175,7 @@ private:
   bool m_virtualWheelEnabled = false;
   SDL_FingerID m_wheelFinger = 0;
   bool m_wheelFingerActive = false;
-  int m_virtualJoyX = 0;
+  std::atomic<int> m_virtualJoyX{0};
   int m_virtualJoyY = 0;
   JoyDetails m_virtualJoyDetails{};
 

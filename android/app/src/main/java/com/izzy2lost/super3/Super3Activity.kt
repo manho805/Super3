@@ -7,10 +7,15 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.Build
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.view.PixelCopy
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.MotionEvent
+import android.view.Surface
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -40,6 +45,7 @@ class Super3Activity : SDLActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var overlayView: View? = null
     private var overlayControlsEnabled: Boolean = true
+    private var gyroSteeringEnabled: Boolean = false
     private var menuPaused = false
     private var saveDialogOpen = false
     private var exitDialogOpen = false
@@ -48,6 +54,12 @@ class Super3Activity : SDLActivity() {
     private var capturingThumbnail = false
     private var gameName: String = ""
     private var userDataRoot: File? = null
+
+    private var gyroSensorManager: SensorManager? = null
+    private var gyroSensor: Sensor? = null
+    private var gyroListener: SensorEventListener? = null
+    private var gyroZeroRollRad: Float? = null
+    private var gyroFilteredSteer: Float = 0f
 
     private data class SaveSlot(
         val slotIndex: Int,
@@ -80,6 +92,7 @@ class Super3Activity : SDLActivity() {
         super.onCreate(savedInstanceState)
 
         overlayControlsEnabled = prefs.getBoolean("overlay_controls_enabled", true)
+        gyroSteeringEnabled = prefs.getBoolean("gyro_steering_enabled", false)
         saveStateSlot = prefs.getInt("save_state_slot", 0).coerceIn(0, 9)
         gameName = intent.getStringExtra("gameName").orEmpty()
         val userDataRootPath = intent.getStringExtra("userDataRoot").orEmpty()
@@ -502,6 +515,116 @@ class Super3Activity : SDLActivity() {
         }
     }
 
+    private fun angleDiffRad(a: Float, b: Float): Float {
+        var d = a - b
+        val twoPi = (Math.PI * 2.0).toFloat()
+        val pi = Math.PI.toFloat()
+        while (d > pi) d -= twoPi
+        while (d < -pi) d += twoPi
+        return d
+    }
+
+    private fun startGyroSteering() {
+        if (!gyroSteeringEnabled) return
+        val game = gameName
+        val gamesXml = intent.getStringExtra("gamesXmlPath").orEmpty()
+        val isRacing =
+            game.isNotBlank() &&
+                gamesXml.isNotBlank() &&
+                GameInputsIndex.hasAnyInputType(gamesXml, game, setOf("vehicle", "harley"))
+        if (!isRacing) return
+
+        val sensitivity = prefs.getFloat("gyro_steering_sensitivity", 1.0f).coerceIn(0.25f, 2.0f)
+
+        if (gyroSensorManager == null) {
+            gyroSensorManager = getSystemService(SENSOR_SERVICE) as? SensorManager
+        }
+        val mgr = gyroSensorManager ?: return
+
+        val sensor =
+            mgr.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)
+                ?: mgr.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+                ?: return
+        gyroSensor = sensor
+
+        gyroZeroRollRad = null
+        gyroFilteredSteer = 0f
+
+        val listener =
+            object : SensorEventListener {
+                private val rotationMatrix = FloatArray(9)
+                private val adjusted = FloatArray(9)
+                private val orientation = FloatArray(3)
+                private val maxRollRad = Math.toRadians(28.0).toFloat()
+
+                override fun onSensorChanged(event: SensorEvent) {
+                    if (!gyroSteeringEnabled) return
+                    if (menuPaused || userPaused) return
+
+                    SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+
+                    val rotation = display?.rotation ?: Surface.ROTATION_0
+                    when (rotation) {
+                        Surface.ROTATION_0 -> rotationMatrix.copyInto(adjusted)
+                        Surface.ROTATION_90 ->
+                            SensorManager.remapCoordinateSystem(
+                                rotationMatrix,
+                                SensorManager.AXIS_Y,
+                                SensorManager.AXIS_MINUS_X,
+                                adjusted,
+                            )
+                        Surface.ROTATION_180 ->
+                            SensorManager.remapCoordinateSystem(
+                                rotationMatrix,
+                                SensorManager.AXIS_MINUS_X,
+                                SensorManager.AXIS_MINUS_Y,
+                                adjusted,
+                            )
+                        Surface.ROTATION_270 ->
+                            SensorManager.remapCoordinateSystem(
+                                rotationMatrix,
+                                SensorManager.AXIS_MINUS_Y,
+                                SensorManager.AXIS_X,
+                                adjusted,
+                            )
+                    }
+
+                    SensorManager.getOrientation(adjusted, orientation)
+                    val roll = orientation[2]
+
+                    val zero = gyroZeroRollRad
+                    if (zero == null) {
+                        gyroZeroRollRad = roll
+                        nativeSetGyroSteer(0f)
+                        return
+                    }
+
+                    val delta = angleDiffRad(roll, zero)
+                    val raw = ((delta / maxRollRad) * sensitivity).coerceIn(-1f, 1f)
+                    gyroFilteredSteer = (gyroFilteredSteer * 0.85f) + (raw * 0.15f)
+                    nativeSetGyroSteer(gyroFilteredSteer)
+                }
+
+                override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+            }
+
+        gyroListener = listener
+        mgr.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_GAME)
+    }
+
+    private fun stopGyroSteering() {
+        val mgr = gyroSensorManager
+        val listener = gyroListener
+        if (mgr != null && listener != null) {
+            mgr.unregisterListener(listener)
+        }
+        gyroListener = null
+        gyroSensor = null
+        gyroZeroRollRad = null
+        gyroFilteredSteer = 0f
+        nativeSetGyroSteer(0f)
+    }
+
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.keyCode == KeyEvent.KEYCODE_BACK) {
             if (event.action == KeyEvent.ACTION_UP) {
@@ -517,6 +640,7 @@ class Super3Activity : SDLActivity() {
     }
 
     override fun onDestroy() {
+        stopGyroSteering()
         overlayView?.let { v ->
             (v.parent as? ViewGroup)?.removeView(v)
         }
@@ -527,6 +651,13 @@ class Super3Activity : SDLActivity() {
     override fun onResume() {
         super.onResume()
         applyImmersiveMode()
+        gyroSteeringEnabled = prefs.getBoolean("gyro_steering_enabled", false)
+        startGyroSteering()
+    }
+
+    override fun onPause() {
+        stopGyroSteering()
+        super.onPause()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -758,6 +889,7 @@ class Super3Activity : SDLActivity() {
     private external fun nativeRequestSaveState(slot: Int): Boolean
     private external fun nativeRequestLoadState(slot: Int): Boolean
     private external fun nativeGetLoadedGameName(): String?
+    private external fun nativeSetGyroSteer(steer: Float): Boolean
 
     private class SaveSlotAdapter(
         private val slots: List<SaveSlot>,
