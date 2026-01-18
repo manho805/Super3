@@ -140,6 +140,8 @@ void CReal3D::LoadState(CBlockFile *SaveState)
   UpdateRenderConfig(Render3D, m_internalRenderConfig);
   SaveState->Read(&commandPortWritten);
   SaveState->Read(&m_pingPong, sizeof(m_pingPong));
+  m_pingPongCopy = m_pingPong;
+  m_tilegenDrawFrame = false;
   for (int i = 0; i < 39; i++)
   {
     uint8_t nul;
@@ -162,13 +164,15 @@ static void UpdateRenderConfig(IRender3D *Render3D, uint64_t internalRenderConfi
   Render3D->SetSignedShade(shadeIsSigned);
 }
 
-void CReal3D::BeginVBlank(int statusCycles)
+void CReal3D::BeginVBlank(void)
 {
-  // Calculate point at which status bit should change value.  Currently the same timing is used for both the status bit in ReadRegister
-  // and in WriteDMARegister32/ReadDMARegister32, however it may be that they are completely unrelated.  It appears that step 1.x games
-  // access just the former while step 2.x access the latter.  It is not known yet what this bit/these bits actually represent.
-	statusChange = ppc_total_cycles() + statusCycles;
-	m_evenFrame = !m_evenFrame;
+  m_pingPongCopy = m_pingPong;
+
+  if (commandPortWritten)
+    FlushTextures();
+
+  if (m_tilegenDrawFrame && commandPortWritten)
+    DrawFrame();
 }
 
 void CReal3D::EndVBlank(void)
@@ -176,12 +180,15 @@ void CReal3D::EndVBlank(void)
   error = false;  // clear error (just needs to be done once per frame)
 }
 
+void CReal3D::FlipPingPongBit(void)
+{
+  m_pingPong = !m_pingPong;
+  m_tilegenDrawFrame = false;
+  commandPortWritten = false;
+}
+
 uint32_t CReal3D::SyncSnapshots(void)
 {
-  // Update read-only copy of command port flag
-  commandPortWrittenRO = commandPortWritten;
-  commandPortWritten = false;
-
   if (!m_gpuMultiThreaded)
     return 0;
 
@@ -268,8 +275,7 @@ void CReal3D::BeginFrame(void)
 
 void CReal3D::RenderFrame(void)
 {
-  //if (commandPortWrittenRO)
-    Render3D->RenderFrame();
+  Render3D->RenderFrame();
 }
 
 void CReal3D::EndFrame(void)
@@ -641,11 +647,8 @@ void CReal3D::WriteDMARegister32(unsigned reg, uint32_t data)
  Basic Emulation Functions, Registers, Memory, and Texture FIFO
 ******************************************************************************/
 
-void CReal3D::Flush(void)
+void CReal3D::FlushTextures()
 {
-  commandPortWritten = true;
-  DebugLog("Real3D 88000000 written @ PC=%08X\n", ppc_get_pc());
-
   // Upload textures (if any)
   if (fifoIdx > 0)
   {
@@ -671,6 +674,42 @@ void CReal3D::Flush(void)
 
   // Reset texture FIFO
   fifoIdx = 0;
+}
+
+bool CReal3D::PollPingPong()
+{
+  return m_pingPong != m_pingPongCopy;
+}
+
+void CReal3D::DrawFrame()
+{
+  m_tilegenDrawFrame = false;
+  commandPortWritten = false;
+}
+
+void CReal3D::TilegenDrawFrame(uint32_t flags)
+{
+  (void)flags;
+  m_tilegenDrawFrame = true;
+
+  if (!PollPingPong())
+  {
+    if (commandPortWritten)
+      DrawFrame();
+  }
+}
+
+void CReal3D::Flush(void)
+{
+  commandPortWritten = true;
+  DebugLog("Real3D 88000000 written @ PC=%08X\n", ppc_get_pc());
+
+  if (!PollPingPong())
+  {
+    FlushTextures();
+    if (m_tilegenDrawFrame)
+      DrawFrame();
+  }
 }
 
 void CReal3D::WriteTextureFIFO(uint32_t data)
@@ -789,16 +828,8 @@ uint32_t CReal3D::ReadRegister(unsigned reg)
   DebugLog("Real3D: Read reg %X\n", reg);
   if (reg == 0)
   {
-	  uint32_t ping_pong;
-
-	  if (m_evenFrame) {
-			ping_pong = (ppc_total_cycles() >= statusChange ? 0x0 : 0x02000000);
-	  }
-	  else {
-			ping_pong = (ppc_total_cycles() >= statusChange ? 0x02000000 : 0x0);
-	  }
-
-		return 0xfdffffff | ping_pong;
+	  uint32_t ping_pong = (m_pingPong ? 0x02000000 : 0x0);
+	  return 0xfdffffff | ping_pong;
   }
 
   else if (reg >= 20 && reg<=32) {	// line of sight registers
@@ -867,8 +898,9 @@ void CReal3D::Reset(void)
   error = false;
 
   m_pingPong = 0;
+  m_pingPongCopy = 0;
   commandPortWritten = false;
-  commandPortWrittenRO = false;
+  m_tilegenDrawFrame = false;
 
   queuedUploadTextures.clear();
   queuedUploadTexturesRO.clear();
@@ -1029,6 +1061,10 @@ CReal3D::CReal3D(const Util::Config::Node &config)
   vrom = NULL;
   error = false;
   fifoIdx = 0;
+  commandPortWritten = false;
+  m_tilegenDrawFrame = false;
+  m_pingPong = 0;
+  m_pingPongCopy = 0;
   m_vromTextureFIFO[0] = 0;
   m_vromTextureFIFO[1] = 0;
   m_vromTextureFIFOIdx = 0;

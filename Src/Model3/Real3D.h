@@ -121,7 +121,7 @@ public:
    *
    * Must be called before the VBlank starts.
    */
-  void BeginVBlank(int statusCycles);
+  void BeginVBlank(void);
   
   /*
    * EndVBlank(void)
@@ -129,6 +129,13 @@ public:
    * Must be called after the VBlank finishes.
    */
   void EndVBlank(void);
+
+  /*
+   * FlipPingPongBit(void)
+   *
+   * Any writes that happen after the ping_pong bit flips but before VBlank are buffered.
+   */
+  void FlipPingPongBit(void);
 
   /*
    * SyncSnapshots(void):
@@ -338,6 +345,14 @@ public:
    *    data    Data.
    */
   void WritePCIConfigSpace(unsigned device, unsigned reg, unsigned bits, unsigned width, uint32_t data);
+
+  /*
+   * TilegenDrawFrame(flags):
+   *
+   * The tilegen controls the frame timing. A write to reg 0x0C appears to
+   * trigger the 3D hardware to draw the frame.
+   */
+  void TilegenDrawFrame(uint32_t flags);
   
   /*
    * Reset(void):
@@ -436,6 +451,9 @@ private:
   void      UploadTexture(uint32_t header, const uint16_t *texData);
   uint32_t  UpdateSnapshots(bool copyWhole);
   uint32_t  UpdateSnapshot(bool copyWhole, uint8_t *src, uint8_t *dst, unsigned size, uint8_t *dirty);
+  void      FlushTextures();
+  bool      PollPingPong();
+  void      DrawFrame();
 
   // Config 
   const Util::Config::Node &m_config;
@@ -497,12 +515,11 @@ private:
   
   // Command port
   bool  commandPortWritten;
-  bool  commandPortWrittenRO; // Read-only copy of flag
+  bool  m_tilegenDrawFrame;
   
   // Status and command registers
   uint32_t m_pingPong;
-  uint64_t statusChange = 0;
-  bool m_evenFrame = false;
+  uint32_t m_pingPongCopy;
   
   // Internal ASIC state
   std::unordered_map<ASIC, uint32_t> m_asicID;

@@ -1772,7 +1772,10 @@ void CModel3::Write32(UINT32 addr, UINT32 data)
     }
     else if ((addr>=0xF1180000) && (addr<0xF1180100))
     {
-      TileGen.WriteRegister(addr&0xFF,FLIPENDIAN32(data));
+      UINT32 flipped = FLIPENDIAN32(data);
+      TileGen.WriteRegister(addr&0xFF, flipped);
+      if (addr == 0xF118000C)
+        GPU.TilegenDrawFrame(flipped);
       break;
     }
 
@@ -2048,19 +2051,9 @@ void CModel3::RunMainBoardFrame(void)
 	// Compute display and VBlank timings
 	unsigned ppcCycles		= m_config["PowerPCFrequency"].ValueAs<unsigned>() * 1000000;
 	unsigned frameCycles	= (unsigned)((float)ppcCycles / 57.524160f);
-	unsigned gapCycles		= (unsigned)((float)frameCycles * 2.5f / 100.0f);	// we need a gap between asserting irq2 & irq 0x40
-	unsigned offsetCycles = (unsigned)((float)frameCycles * 33.f / 100.0f);
-	unsigned dispCycles		= frameCycles - gapCycles - offsetCycles;
-	unsigned statusCycles = (unsigned)((float)frameCycles * (0.005f));
-
-	// we think a frame looks like this on the model 2
-	//                         66% of frame
-	// [irq2------------------ping_pong_flips------]
-	//
-	// Games will start writing a new frame at the ping_pong time. It could be the buffer swaps here.
-	// Need more h/w testing to confirm.
-	// What we are doing here is asserting IRQ2 at 33% of the frame, and treating the ping_pong flip as the front/back buffer swap
-	// This way the data for the correct frames, ends up in the right frames!
+	unsigned lineCycles     = frameCycles / 424;
+	unsigned vBlankCycles   = lineCycles * 40;
+	unsigned dispCycles		= lineCycles * 384;
 
 	// Scale PPC timer ratio according to speed at which the PowerPC is being emulated so that the observed running frequency of the PPC timer
 	// registers is more or less correct.  This is needed to get the Virtua Striker 2 series of games running at the right speed (they are
@@ -2072,11 +2065,8 @@ void CModel3::RunMainBoardFrame(void)
 	if (gpusReady)
 	{
 		TileGen.BeginVBlank();
-		GPU.BeginVBlank(statusCycles);	// Games poll the ping_pong at startup. Values aren't 100% accurate so we stretch the frame a bit to ensure writes happen in the correct frame
-
-		ppc_execute(offsetCycles);
-		IRQ.Assert(0x02);								// start at 33% of the frame
-		ppc_execute(gapCycles);					// need a gap between asserting irqs
+		GPU.BeginVBlank();
+		ppc_execute(vBlankCycles);
 
 		/*
 		* Sound:
@@ -2100,7 +2090,10 @@ void CModel3::RunMainBoardFrame(void)
 			// Process MIDI interrupt
 			IRQ.Assert(0x40);
 			ppc_execute(500); // give PowerPC time to acknowledge IR
-			dispCycles -= 500;
+			if (dispCycles >= 500)
+				dispCycles -= 500;
+			else
+				dispCycles = 0;
 
 			++irqCount;
 			if (irqCount > 128)
@@ -2117,7 +2110,25 @@ void CModel3::RunMainBoardFrame(void)
 	}
 
 	// Run the PowerPC for the active display part of the frame
-	ppc_execute(dispCycles);
+	unsigned pingPongFlipLine = TileGen.ReadRegister(0x08);
+	for (unsigned i = 0; i < 384; i++)
+	{
+		if (i == pingPongFlipLine)
+			GPU.FlipPingPongBit();
+
+		if (i == 383)
+			IRQ.Assert(0x02);
+
+		unsigned cycles = lineCycles;
+		if (dispCycles < cycles)
+			cycles = dispCycles;
+
+		if (cycles > 0)
+			ppc_execute(cycles);
+
+		if (dispCycles >= cycles)
+			dispCycles -= cycles;
+	}
 
 	timings.ppcTicks = CThread::GetTicks() - start;
 }
