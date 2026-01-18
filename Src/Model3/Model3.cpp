@@ -2225,6 +2225,7 @@ bool CModel3::StartThreads(void)
   // Reset thread flags
   pauseThreads = false;
   stopThreads = false;
+  sndBrdWakeNotify = false;
 
   // Create PPC main board thread, if multi-threading GPU
   if (m_gpuMultiThreaded)
@@ -2254,6 +2255,7 @@ bool CModel3::StartThreads(void)
   if (!syncSndBrdThread)
   {
     SetAudioCallback(AudioCallback, this);
+    WakeSoundBoardThread();  // kick once in case the audio callback is delayed
   }
 
   startedThreads = true;
