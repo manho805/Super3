@@ -62,6 +62,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnWidescreen: MaterialButton
     private lateinit var btnWideBackground: MaterialButton
     private lateinit var btnReal3dRenderer: MaterialButton
+    private lateinit var btnDaytonaTiming: MaterialButton
 
     private lateinit var gamesAdapter: GamesAdapter
 
@@ -167,6 +168,7 @@ class MainActivity : AppCompatActivity() {
         btnWidescreen = headerView.findViewById(R.id.btn_widescreen)
         btnWideBackground = headerView.findViewById(R.id.btn_wide_background)
         btnReal3dRenderer = headerView.findViewById(R.id.btn_real3d_renderer)
+        btnDaytonaTiming = headerView.findViewById(R.id.btn_daytona_timing)
         val btnShowTouchControls: MaterialButton = headerView.findViewById(R.id.btn_show_touch_controls)
         val btnShowShifterOverlay: MaterialButton = headerView.findViewById(R.id.btn_show_shifter_overlay)
         val btnGyroSteering: MaterialButton = headerView.findViewById(R.id.btn_gyro_steering)
@@ -196,6 +198,7 @@ class MainActivity : AppCompatActivity() {
         btnRescan.setOnClickListener { refreshUi() }
 
         bindVideoSettingsUi()
+        bindTimingUi()
 
         btnShowTouchControls.isChecked = prefs.getBoolean("overlay_controls_enabled", true)
         btnShowTouchControls.setOnClickListener {
@@ -296,6 +299,7 @@ class MainActivity : AppCompatActivity() {
         AssetInstaller.ensureInstalled(this, internalUserRoot())
 
         applyVideoSettingsToIni(internalUserRoot(), loadVideoSettings())
+        applyTimingDefaultToIni(internalUserRoot(), loadTimingPref())
 
         applyViewMode(viewMode)
         refreshUi()
@@ -687,6 +691,45 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun loadTimingPref(): Boolean {
+        if (prefs.contains("timing_legacy_default")) {
+            return prefs.getBoolean("timing_legacy_default", true)
+        }
+        return prefs.getBoolean("daytona_timing_legacy", true)
+    }
+
+    private fun updateTimingLabel(legacy: Boolean) {
+        btnDaytonaTiming.text =
+            if (legacy) {
+                getString(R.string.timing_legacy)
+            } else {
+                getString(R.string.timing_new)
+            }
+    }
+
+    private fun bindTimingUi() {
+        val legacy = loadTimingPref()
+        btnDaytonaTiming.isChecked = legacy
+        updateTimingLabel(legacy)
+        btnDaytonaTiming.setOnClickListener {
+            val enabled = btnDaytonaTiming.isChecked
+            prefs.edit().putBoolean("timing_legacy_default", enabled).remove("daytona_timing_legacy").apply()
+            applyTimingDefaultToIni(internalUserRoot(), enabled)
+            val tree = userTreeUri
+            if (tree != null) {
+                thread(name = "Super3SyncSettings") {
+                    UserDataSync.syncInternalIntoTree(this, internalUserRoot(), tree, UserDataSync.DIRS_SETTINGS_ONLY)
+                }
+            }
+            updateTimingLabel(enabled)
+            Toast.makeText(
+                this,
+                "Timing set to ${if (enabled) "Legacy" else "New"} (restart game to apply)",
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
     private fun exactDeviceResolution(widthPx: Int, heightPx: Int): ResolutionOption {
         val x = max(1, max(widthPx, heightPx))
         val y = max(1, min(widthPx, heightPx))
@@ -788,6 +831,75 @@ class MainActivity : AppCompatActivity() {
         out.addAll(lines.drop(globalEnd))
         file.parentFile?.mkdirs()
         file.writeText(out.joinToString("\n"))
+    }
+
+    private fun updateIniSection(file: File, section: String, updates: Map<String, String>) {
+        val lines = if (file.exists()) file.readLines() else emptyList()
+        val out = ArrayList<String>(lines.size + updates.size + 8)
+
+        fun isSectionHeader(s: String): Boolean {
+            val t = s.trim()
+            return t.startsWith("[") && t.endsWith("]")
+        }
+
+        fun sectionName(s: String): String {
+            return s.trim().removePrefix("[").removeSuffix("]").trim()
+        }
+
+        val targetStart = lines.indexOfFirst { isSectionHeader(it) && sectionName(it).equals(section, ignoreCase = true) }
+        if (targetStart < 0) {
+            out.addAll(lines)
+            if (out.isNotEmpty() && out.last().isNotBlank()) out.add("")
+            out.add("[ $section ]")
+            for ((k, v) in updates) {
+                out.add("$k = $v")
+            }
+            file.parentFile?.mkdirs()
+            file.writeText(out.joinToString("\n"))
+            return
+        }
+
+        val targetEnd =
+            (targetStart + 1 + lines.drop(targetStart + 1).indexOfFirst { isSectionHeader(it) })
+                .let { if (it <= targetStart) lines.size else it }
+
+        out.addAll(lines.take(targetStart + 1))
+
+        val existing = HashMap<String, Int>(updates.size)
+        for (i in (targetStart + 1) until targetEnd) {
+            val line = lines[i]
+            val trimmed = line.trim()
+            if (trimmed.startsWith(";") || trimmed.isBlank()) {
+                out.add(line)
+                continue
+            }
+            var replaced = false
+            for ((k, v) in updates) {
+                val rx = Regex("^\\s*${Regex.escape(k)}\\s*=", RegexOption.IGNORE_CASE)
+                if (rx.containsMatchIn(line)) {
+                    out.add("$k = $v")
+                    existing[k.lowercase()] = 1
+                    replaced = true
+                    break
+                }
+            }
+            if (!replaced) out.add(line)
+        }
+
+        for ((k, v) in updates) {
+            if (existing.containsKey(k.lowercase())) continue
+            out.add("$k = $v")
+        }
+
+        out.addAll(lines.drop(targetEnd))
+        file.parentFile?.mkdirs()
+        file.writeText(out.joinToString("\n"))
+    }
+
+    private fun applyTimingDefaultToIni(internalRoot: File, legacy: Boolean) {
+        val ini = supermodelIniFile(internalRoot)
+        val value = if (legacy) "1" else "0"
+        updateIniKeys(ini, mapOf("LegacyReal3DTiming" to value))
     }
 
     private fun persistTreePermission(uri: Uri) {

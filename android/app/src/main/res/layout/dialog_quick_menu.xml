@@ -7,22 +7,22 @@
     android:paddingTop="8dp"
     android:paddingBottom="8dp">
 
-    <!-- Pause/Resume -->
+    <!-- Exit Game -->
     <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_pause_resume"
+        android:id="@+id/btn_exit_game"
         style="@style/Widget.Material3.Button.TextButton.Icon"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:gravity="start|center_vertical"
         android:paddingStart="24dp"
         android:paddingEnd="24dp"
-        android:text="@string/quick_menu_pause"
+        android:text="@string/quick_menu_exit_game"
         android:textAlignment="viewStart"
-        app:icon="@drawable/play_pause_24px"
+        app:icon="@drawable/exit_to_app_24px"
         app:iconGravity="start"
         app:iconPadding="32dp"
         app:iconSize="24dp"
-        app:iconTint="?attr/colorOnSurface" />
+        app:iconTint="?attr/colorError" />
 
     <!-- Save States -->
     <com.google.android.material.button.MaterialButton
@@ -75,21 +75,32 @@
         app:iconSize="24dp"
         app:iconTint="?attr/colorOnSurface" />
 
-    <!-- Exit Game -->
+    <!-- Daytona Timing -->
     <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_exit_game"
+        android:id="@+id/btn_daytona_timing"
         style="@style/Widget.Material3.Button.TextButton.Icon"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:gravity="start|center_vertical"
         android:paddingStart="24dp"
         android:paddingEnd="24dp"
-        android:text="@string/quick_menu_exit_game"
+        android:text="@string/timing_legacy"
         android:textAlignment="viewStart"
-        app:icon="@drawable/exit_to_app_24px"
+        app:icon="@drawable/refresh_24px"
         app:iconGravity="start"
         app:iconPadding="32dp"
         app:iconSize="24dp"
-        app:iconTint="?attr/colorError" />
+        app:iconTint="?attr/colorOnSurface" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:id="@+id/timing_note"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:layout_marginTop="6dp"
+        android:text="@string/timing_note"
+        android:textAppearance="?attr/textAppearanceBodySmall"
+        android:textColor="?attr/colorOnSurfaceVariant" />
 
 </LinearLayout>

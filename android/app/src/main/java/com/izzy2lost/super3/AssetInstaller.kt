@@ -78,8 +78,16 @@ object AssetInstaller {
                 "InputAnalogTriggerRight2 = NONE" to "InputAnalogTriggerRight2 = JOY2_ZAXIS_POS,JOY2_BUTTON2",
             )
         val updated =
-            lines.map { line ->
+            lines.mapNotNull { line ->
                 val trimmed = line.trim()
+                if (trimmed.startsWith("PingPongFlipLine", ignoreCase = true)) {
+                    changed = true
+                    return@mapNotNull null
+                }
+                if (trimmed.startsWith("LegacyStatusBit", ignoreCase = true)) {
+                    changed = true
+                    return@mapNotNull null
+                }
                 val repl = replacements[trimmed]
                 if (repl != null) {
                     changed = true
@@ -89,7 +97,32 @@ object AssetInstaller {
                 }
             }
 
+        val out = ArrayList<String>(updated)
+        fun ensureKey(section: String, key: String, value: String) {
+            val sectionIdx = out.indexOfFirst { it.trim().equals(section, ignoreCase = true) }
+            if (sectionIdx < 0) {
+                if (out.isNotEmpty() && out.last().isNotBlank()) out.add("")
+                out.add(section)
+                out.add("$key = $value")
+                changed = true
+                return
+            }
+
+            val endIdx = (sectionIdx + 1 + out.drop(sectionIdx + 1).indexOfFirst { it.trim().startsWith("[") })
+                .let { if (it <= sectionIdx) out.size else it }
+
+            val hasKey = out.subList(sectionIdx + 1, endIdx).any {
+                it.trim().startsWith("$key", ignoreCase = true)
+            }
+            if (hasKey) return
+
+            out.add(endIdx, "$key = $value")
+            changed = true
+        }
+
+        ensureKey("[ Global ]", "LegacyReal3DTiming", "1")
+
         if (!changed) return
-        runCatching { ini.writeText(updated.joinToString(System.lineSeparator())) }
+        runCatching { ini.writeText(out.joinToString(System.lineSeparator())) }
     }
 }

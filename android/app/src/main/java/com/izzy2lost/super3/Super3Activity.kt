@@ -25,6 +25,7 @@ import android.widget.LinearLayout
 import android.widget.RelativeLayout
 import android.view.SurfaceView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -707,26 +708,8 @@ class Super3Activity : SDLActivity() {
     }
 
     private fun handleBackPress() {
-        if (exitDialogOpen) return
-        exitDialogOpen = true
-        updatePauseState()
-        MaterialAlertDialogBuilder(
-            this,
-            com.google.android.material.R.style.ThemeOverlay_Material3_MaterialAlertDialog,
-        )
-            .setTitle(R.string.exit_game_title)
-            .setMessage(R.string.exit_game_message)
-            .setPositiveButton(R.string.exit_game_confirm) { _, _ ->
-                finish()
-            }
-            .setNegativeButton(R.string.exit_game_cancel) { dialog, _ ->
-                dialog.dismiss()
-            }
-            .setOnDismissListener {
-                exitDialogOpen = false
-                updatePauseState()
-            }
-            .show()
+        if (quickMenuOpen || saveDialogOpen || exitDialogOpen || capturingThumbnail) return
+        showQuickOptionsMenu()
     }
 
     private fun updatePauseState() {
@@ -743,16 +726,23 @@ class Super3Activity : SDLActivity() {
 
         val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_quick_menu, null)
         
-        val btnPauseResume = dialogView.findViewById<MaterialButton>(R.id.btn_pause_resume)
         val btnSaveStates = dialogView.findViewById<MaterialButton>(R.id.btn_save_states)
         val btnTouchControls = dialogView.findViewById<MaterialButton>(R.id.btn_touch_controls)
         val btnGyroSteering = dialogView.findViewById<MaterialButton>(R.id.btn_gyro_steering)
+        val btnDaytonaTiming = dialogView.findViewById<MaterialButton>(R.id.btn_daytona_timing)
         val btnExitGame = dialogView.findViewById<MaterialButton>(R.id.btn_exit_game)
 
         // Set initial text states
-        btnPauseResume.text = getString(if (userPaused) R.string.quick_menu_resume else R.string.quick_menu_pause)
         btnTouchControls.text = getString(if (overlayControlsEnabled) R.string.quick_menu_hide_touch_controls else R.string.quick_menu_show_touch_controls)
         btnGyroSteering.text = getString(if (gyroSteeringEnabled) R.string.quick_menu_disable_gyro else R.string.quick_menu_enable_gyro)
+        val game = gameName
+        val legacy = if (game.isNotBlank()) {
+            loadTimingFromIni(game)
+        } else {
+            prefs.getBoolean("timing_legacy_default", true)
+        }
+        btnDaytonaTiming.text =
+            getString(if (legacy) R.string.timing_legacy_game else R.string.timing_new_game)
 
         val dialog = MaterialAlertDialogBuilder(
             this,
@@ -767,12 +757,6 @@ class Super3Activity : SDLActivity() {
             }
             .create()
 
-        btnPauseResume.setOnClickListener {
-            userPaused = !userPaused
-            updatePauseState()
-            dialog.dismiss()
-        }
-
         btnSaveStates.setOnClickListener {
             dialog.dismiss()
             mainHandler.post { showSaveStateDialog() }
@@ -785,6 +769,24 @@ class Super3Activity : SDLActivity() {
 
         btnGyroSteering.setOnClickListener {
             applyGyroSteeringEnabled(!gyroSteeringEnabled, persist = true)
+            dialog.dismiss()
+        }
+
+        btnDaytonaTiming.setOnClickListener {
+            val current = if (game.isNotBlank()) loadTimingFromIni(game) else prefs.getBoolean("timing_legacy_default", true)
+            val legacy = !current
+            if (game.isNotBlank()) {
+                userDataRoot?.let { root ->
+                    applyGameTimingToIni(root, game, legacy)
+                }
+            }
+            btnDaytonaTiming.text =
+                getString(if (legacy) R.string.timing_legacy_game else R.string.timing_new_game)
+            Toast.makeText(
+                this,
+                "Timing set to ${if (legacy) "Legacy" else "New"} (restart game to apply)",
+                Toast.LENGTH_SHORT,
+            ).show()
             dialog.dismiss()
         }
 
@@ -816,6 +818,112 @@ class Super3Activity : SDLActivity() {
         } else {
             stopGyroSteering()
         }
+    }
+
+    private fun applyGameTimingToIni(internalRoot: File, game: String, legacy: Boolean) {
+        val ini = File(File(internalRoot, "Config"), "Supermodel.ini")
+        val value = if (legacy) "1" else "0"
+        updateIniSection(ini, game, mapOf("LegacyReal3DTiming" to value))
+    }
+
+    private fun loadTimingFromIni(game: String): Boolean {
+        val ini = File(File(userDataRoot ?: return true, "Config"), "Supermodel.ini")
+        val perGame = readIniSectionValue(ini, game, "LegacyReal3DTiming")?.let { parseBool(it) }
+        if (perGame != null) return perGame
+        val global = readIniSectionValue(ini, "global", "LegacyReal3DTiming")?.let { parseBool(it) }
+        if (global != null) return global
+        return prefs.getBoolean("timing_legacy_default", true)
+    }
+
+    private fun parseBool(v: String): Boolean? {
+        return when (v.trim().lowercase()) {
+            "1", "true", "yes", "on" -> true
+            "0", "false", "no", "off" -> false
+            else -> null
+        }
+    }
+
+    private fun readIniSectionValue(file: File, section: String, key: String): String? {
+        if (!file.exists()) return null
+        val lines = file.readLines()
+        val keyRegex = Regex("^\\s*${Regex.escape(key)}\\s*=\\s*(.*?)\\s*$", RegexOption.IGNORE_CASE)
+        var inSection = false
+        for (line in lines) {
+            val trimmed = line.trim()
+            if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                val name = trimmed.removePrefix("[").removeSuffix("]").trim()
+                inSection = name.equals(section, ignoreCase = true)
+                continue
+            }
+            if (!inSection) continue
+            if (trimmed.startsWith(";")) continue
+            val m = keyRegex.find(line) ?: continue
+            return m.groupValues[1]
+        }
+        return null
+    }
+
+    private fun updateIniSection(file: File, section: String, updates: Map<String, String>) {
+        val lines = if (file.exists()) file.readLines() else emptyList()
+        val out = ArrayList<String>(lines.size + updates.size + 8)
+
+        fun isSectionHeader(s: String): Boolean {
+            val t = s.trim()
+            return t.startsWith("[") && t.endsWith("]")
+        }
+
+        fun sectionName(s: String): String {
+            return s.trim().removePrefix("[").removeSuffix("]").trim()
+        }
+
+        val targetStart = lines.indexOfFirst { isSectionHeader(it) && sectionName(it).equals(section, ignoreCase = true) }
+        if (targetStart < 0) {
+            out.addAll(lines)
+            if (out.isNotEmpty() && out.last().isNotBlank()) out.add("")
+            out.add("[ $section ]")
+            for ((k, v) in updates) {
+                out.add("$k = $v")
+            }
+            file.parentFile?.mkdirs()
+            file.writeText(out.joinToString("\n"))
+            return
+        }
+
+        val targetEnd =
+            (targetStart + 1 + lines.drop(targetStart + 1).indexOfFirst { isSectionHeader(it) })
+                .let { if (it <= targetStart) lines.size else it }
+
+        out.addAll(lines.take(targetStart + 1))
+
+        val existing = HashMap<String, Int>(updates.size)
+        for (i in (targetStart + 1) until targetEnd) {
+            val line = lines[i]
+            val trimmed = line.trim()
+            if (trimmed.startsWith(";") || trimmed.isBlank()) {
+                out.add(line)
+                continue
+            }
+            var replaced = false
+            for ((k, v) in updates) {
+                val rx = Regex("^\\s*${Regex.escape(k)}\\s*=", RegexOption.IGNORE_CASE)
+                if (rx.containsMatchIn(line)) {
+                    out.add("$k = $v")
+                    existing[k.lowercase()] = 1
+                    replaced = true
+                    break
+                }
+            }
+            if (!replaced) out.add(line)
+        }
+
+        for ((k, v) in updates) {
+            if (existing.containsKey(k.lowercase())) continue
+            out.add("$k = $v")
+        }
+
+        out.addAll(lines.drop(targetEnd))
+        file.parentFile?.mkdirs()
+        file.writeText(out.joinToString("\n"))
     }
 
     private fun handleStartSelectCombo(event: KeyEvent): Boolean {

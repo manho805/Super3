@@ -148,6 +148,15 @@ protected:
 // Emulator host --------------------------------------------------------------
 
 static struct Super3Host* g_host = nullptr;
+static GlesPresenter* g_presenter = nullptr;
+
+static void AndroidTileBlit(const uint32_t* pixelsARGB, int width, int height, bool alphaBlend)
+{
+  if (!g_presenter || !pixelsARGB || width <= 0 || height <= 0)
+    return;
+  g_presenter->UpdateFrameARGB(pixelsARGB, width, height);
+  g_presenter->Render(alphaBlend);
+}
 
 struct Super3Host {
   static constexpr int32_t STATE_FILE_VERSION = 3;
@@ -830,6 +839,8 @@ extern "C" int SDL_main(int argc, char* argv[]) {
   }
 
   Super3Host host;
+  g_presenter = &presenter;
+  CRender2D::SetAndroidTileBlit(&AndroidTileBlit);
   g_host = &host;
   // Initialize renderer backends up-front. The core will attach VRAM/palette/register
   // pointers later (after it has initialized the tile generator).

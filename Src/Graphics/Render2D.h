@@ -40,8 +40,12 @@ namespace Util { namespace Config { class Node; } }
 class CRender2D
 {
 public:
+  using AndroidTileBlitFn = void (*)(const uint32_t* pixelsARGB, int width, int height, bool alphaBlend);
+
   explicit CRender2D(const Util::Config::Node &config);
   ~CRender2D() = default;
+
+  static void SetAndroidTileBlit(AndroidTileBlitFn fn);
 
   void BeginFrame(void);
   void PreRenderFrame(void);

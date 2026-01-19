@@ -24,6 +24,8 @@ static inline uint32_t ARGB(uint8_t a, uint8_t r, uint8_t g, uint8_t b)
   return (uint32_t(a) << 24) | (uint32_t(r) << 16) | (uint32_t(g) << 8) | uint32_t(b);
 }
 
+static CRender2D::AndroidTileBlitFn g_tileBlit = nullptr;
+
 template <int bits, bool alphaTest, bool clip>
 static inline void DrawTileLine(uint32_t *line,
                                 int pixelOffset,
@@ -143,6 +145,11 @@ static void DrawLayer(uint32_t *pixels, int layerNum, const uint32_t *vram, cons
 
 CRender2D::CRender2D(const Util::Config::Node &config) : m_config(config) {}
 
+void CRender2D::SetAndroidTileBlit(AndroidTileBlitFn fn)
+{
+  g_tileBlit = fn;
+}
+
 bool CRender2D::Init(unsigned /*xOffset*/, unsigned /*yOffset*/, unsigned xRes, unsigned yRes, unsigned /*totalXRes*/, unsigned /*totalYRes*/)
 {
   // Use the core's nominal resolution if present, but fall back to known TG size.
@@ -252,6 +259,10 @@ void CRender2D::RenderFrameBottom(void)
     std::memcpy(m_frame.data(), m_bottomSurface.data(), m_frame.size() * sizeof(uint32_t));
   else
     std::fill(m_frame.begin(), m_frame.end(), ARGB(0xFF, 0, 0, 0));
+
+  if (g_tileBlit && m_surfacesPresent.second) {
+    g_tileBlit(m_bottomSurface.data(), (int)m_xPixels, (int)m_yPixels, false);
+  }
 }
 
 void CRender2D::CompositeTopOntoFrame()

@@ -164,8 +164,18 @@ static void UpdateRenderConfig(IRender3D *Render3D, uint64_t internalRenderConfi
   Render3D->SetSignedShade(shadeIsSigned);
 }
 
-void CReal3D::BeginVBlank(void)
+void CReal3D::BeginVBlank(int statusCycles)
 {
+  const bool legacyTiming =
+    m_config["LegacyReal3DTiming"].ValueAsDefault<bool>(
+      m_config["LegacyStatusBit"].ValueAsDefault<bool>(false));
+  m_useLegacyStatusBit = legacyTiming;
+  if (m_useLegacyStatusBit)
+  {
+    statusChange = ppc_total_cycles() + statusCycles;
+    m_evenFrame = !m_evenFrame;
+  }
+
   m_pingPongCopy = m_pingPong;
 
   if (commandPortWritten)
@@ -828,8 +838,19 @@ uint32_t CReal3D::ReadRegister(unsigned reg)
   DebugLog("Real3D: Read reg %X\n", reg);
   if (reg == 0)
   {
-	  uint32_t ping_pong = (m_pingPong ? 0x02000000 : 0x0);
-	  return 0xfdffffff | ping_pong;
+    if (m_useLegacyStatusBit)
+    {
+      uint32_t ping_pong;
+      if (m_evenFrame) {
+        ping_pong = (ppc_total_cycles() >= statusChange ? 0x0 : 0x02000000);
+      } else {
+        ping_pong = (ppc_total_cycles() >= statusChange ? 0x02000000 : 0x0);
+      }
+      return 0xfdffffff | ping_pong;
+    }
+
+    uint32_t ping_pong = (m_pingPong ? 0x02000000 : 0x0);
+    return 0xfdffffff | ping_pong;
   }
 
   else if (reg >= 20 && reg<=32) {	// line of sight registers
@@ -899,6 +920,9 @@ void CReal3D::Reset(void)
 
   m_pingPong = 0;
   m_pingPongCopy = 0;
+  statusChange = 0;
+  m_evenFrame = false;
+  m_useLegacyStatusBit = false;
   commandPortWritten = false;
   m_tilegenDrawFrame = false;
 
@@ -1065,6 +1089,9 @@ CReal3D::CReal3D(const Util::Config::Node &config)
   m_tilegenDrawFrame = false;
   m_pingPong = 0;
   m_pingPongCopy = 0;
+  statusChange = 0;
+  m_evenFrame = false;
+  m_useLegacyStatusBit = false;
   m_vromTextureFIFO[0] = 0;
   m_vromTextureFIFO[1] = 0;
   m_vromTextureFIFOIdx = 0;

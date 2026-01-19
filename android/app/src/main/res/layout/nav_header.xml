@@ -110,6 +110,24 @@
       android:text="3D renderer (Real3D)"
       style="?attr/materialButtonElevatedStyle" />
 
+    <com.google.android.material.button.MaterialButton
+      android:id="@+id/btn_daytona_timing"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="12dp"
+      android:checkable="true"
+      android:text="@string/timing_legacy"
+      style="?attr/materialButtonElevatedStyle" />
+
+    <com.google.android.material.textview.MaterialTextView
+      android:id="@+id/timing_note"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="8dp"
+      android:text="@string/timing_note"
+      android:textAppearance="?attr/textAppearanceBodySmall"
+      android:textColor="?attr/colorOnPrimary" />
+
     <com.google.android.material.textview.MaterialTextView
       android:id="@+id/controls_title"
       android:layout_width="match_parent"

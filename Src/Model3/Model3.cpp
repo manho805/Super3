@@ -2054,6 +2054,10 @@ void CModel3::RunMainBoardFrame(void)
 	unsigned lineCycles     = frameCycles / 424;
 	unsigned vBlankCycles   = lineCycles * 40;
 	unsigned dispCycles		= lineCycles * 384;
+	unsigned statusCycles   = (unsigned)((float)frameCycles * (0.005f));
+	const bool legacyTiming =
+		m_config["LegacyReal3DTiming"].ValueAsDefault<bool>(
+			m_config["LegacyStatusBit"].ValueAsDefault<bool>(false));
 
 	// Scale PPC timer ratio according to speed at which the PowerPC is being emulated so that the observed running frequency of the PPC timer
 	// registers is more or less correct.  This is needed to get the Virtua Striker 2 series of games running at the right speed (they are
@@ -2065,8 +2069,21 @@ void CModel3::RunMainBoardFrame(void)
 	if (gpusReady)
 	{
 		TileGen.BeginVBlank();
-		GPU.BeginVBlank();
-		ppc_execute(vBlankCycles);
+		GPU.BeginVBlank((int)statusCycles);
+		if (legacyTiming)
+		{
+			unsigned gapCycles		= (unsigned)((float)frameCycles * 2.5f / 100.0f);	// gap between IRQ2 & IRQ 0x40
+			unsigned offsetCycles = (unsigned)((float)frameCycles * 33.f / 100.0f);
+			dispCycles = frameCycles - gapCycles - offsetCycles;
+			ppc_execute(offsetCycles);
+			IRQ.Assert(0x02);								// start at 33% of the frame
+			ppc_execute(gapCycles);						// need a gap between asserting irqs
+		}
+		else
+		{
+			dispCycles = lineCycles * 384;
+			ppc_execute(vBlankCycles);
+		}
 
 		/*
 		* Sound:
@@ -2110,24 +2127,37 @@ void CModel3::RunMainBoardFrame(void)
 	}
 
 	// Run the PowerPC for the active display part of the frame
-	unsigned pingPongFlipLine = TileGen.ReadRegister(0x08);
-	for (unsigned i = 0; i < 384; i++)
+	if (legacyTiming)
 	{
-		if (i == pingPongFlipLine)
-			GPU.FlipPingPongBit();
+		ppc_execute(dispCycles);
+	}
+	else
+	{
+		// TileGen reg 0x08 is a line counter; clamp to the visible 0-383 range.
+		unsigned pingPongFlipLine = TileGen.ReadRegister(0x08) & 0x1FFu;
+		const int overrideLine = m_config["PingPongFlipLine"].ValueAsDefault<int>(-1);
+		if (overrideLine >= 0)
+			pingPongFlipLine = static_cast<unsigned>(overrideLine);
+		if (pingPongFlipLine >= 384u)
+			pingPongFlipLine = 383u;
+		for (unsigned i = 0; i < 384; i++)
+		{
+			if (i == pingPongFlipLine)
+				GPU.FlipPingPongBit();
 
-		if (i == 383)
-			IRQ.Assert(0x02);
+			if (i == 383)
+				IRQ.Assert(0x02);
 
-		unsigned cycles = lineCycles;
-		if (dispCycles < cycles)
-			cycles = dispCycles;
+			unsigned cycles = lineCycles;
+			if (dispCycles < cycles)
+				cycles = dispCycles;
 
-		if (cycles > 0)
-			ppc_execute(cycles);
+			if (cycles > 0)
+				ppc_execute(cycles);
 
-		if (dispCycles >= cycles)
-			dispCycles -= cycles;
+			if (dispCycles >= cycles)
+				dispCycles -= cycles;
+		}
 	}
 
 	timings.ppcTicks = CThread::GetTicks() - start;

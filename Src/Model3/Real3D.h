@@ -117,11 +117,11 @@ public:
   void LoadState(CBlockFile *SaveState);
 
   /*
-   * BeginVBlank(void):
+   * BeginVBlank(statusCycles):
    *
    * Must be called before the VBlank starts.
    */
-  void BeginVBlank(void);
+  void BeginVBlank(int statusCycles);
   
   /*
    * EndVBlank(void)
@@ -520,6 +520,9 @@ private:
   // Status and command registers
   uint32_t m_pingPong;
   uint32_t m_pingPongCopy;
+  uint64_t statusChange = 0;
+  bool m_evenFrame = false;
+  bool m_useLegacyStatusBit = false;
   
   // Internal ASIC state
   std::unordered_map<ASIC, uint32_t> m_asicID;
